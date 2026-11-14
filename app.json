@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "panel",
-    "slug": "panel",
+    "name": "Koma",
+    "slug": "koma",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -11,15 +11,37 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#F4F1EA",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.panel.manga"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sharing",
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Koma uses your photos to draw them as manga panels."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "savePhotosPermission": "Koma saves finished pages to your photos."
+        }
+      ]
+    ],
+    "scheme": "koma",
+    "experiments": {
+      "typedRoutes": true
     }
   }
 }

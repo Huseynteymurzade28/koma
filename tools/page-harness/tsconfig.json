@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "module": "commonjs",
+    "esModuleInterop": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["../../src/*"],
+      "@shopify/react-native-skia": ["./skia-shim.ts"]
+    }
+  }
+}
