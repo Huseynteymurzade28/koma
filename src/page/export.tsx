@@ -25,7 +25,7 @@ export async function renderPagePng(page: Page, images: (SkImage | null)[], font
 }
 
 export async function saveToPhotos(uri: string) {
-  const { granted } = await requestPermissionsAsync(true);
+  const { granted } = await requestPermissionsAsync(true, ['photo']);
   if (!granted) throw new Error('Koma needs permission to save to your photos.');
   await Asset.create(uri);
 }

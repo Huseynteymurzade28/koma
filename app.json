@@ -17,7 +17,10 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.panel.manga"
+      "package": "com.panel.manga",
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -29,13 +32,27 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Koma uses your photos to draw them as manga panels."
+          "photosPermission": "Koma uses your photos to draw them as manga panels.",
+          "cameraPermission": "Koma uses the camera to take photos for your manga panels.",
+          "microphonePermission": false
         }
       ],
       [
         "expo-media-library",
         {
-          "savePhotosPermission": "Koma saves finished pages to your photos."
+          "savePhotosPermission": "Koma saves finished pages to your photos.",
+          "granularPermissions": [
+            "photo"
+          ]
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#F4F1EA"
         }
       ]
     ],

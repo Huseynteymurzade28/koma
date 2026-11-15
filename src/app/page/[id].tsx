@@ -1,6 +1,5 @@
 import { Canvas, Group, type SkImage } from '@shopify/react-native-skia';
 import * as Haptics from 'expo-haptics';
-import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -25,7 +24,8 @@ import { renderPagePng, saveToPhotos, sharePng } from '@/page/export';
 import { usePageFonts, type PageFonts } from '@/page/fonts';
 import { getLayout, layoutsFor, MAX_PANELS, panelRects, TITLE_H, MARGIN, type Rect } from '@/page/layouts';
 import { PageDrawing } from '@/page/PageDrawing';
-import { copyPhoto, loadPage, photoFile, savePage, uid } from '@/page/store';
+import { pickPhotos } from '@/page/photos';
+import { copyPhoto, loadPage, photoFile, prunePhotos, savePage, uid } from '@/page/store';
 import { layoutItem } from '@/page/textLayout';
 import { PAGE_H, PAGE_W, type Mood, type Page, type Panel, type TextItem, type TextKind } from '@/page/types';
 import { color, font, space } from '@/theme';
@@ -36,6 +36,8 @@ type Selection = { type: 'panel'; index: number } | { type: 'item'; id: string }
 
 const SELECT = '#E0452B';
 const TAP_SLOP = 6;
+const MAX_ZOOM = 3;
+const MAX_HISTORY = 50;
 
 export default function Editor() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -49,10 +51,18 @@ export default function Editor() {
   const [stage, setStage] = useState({ w: 0, h: 0 });
   const [busy, setBusy] = useState<string | null>(null);
 
+  // always the newest page, so several edits in one frame build on each other
+  const pageRef = useRef<Page | null>(null);
+
   // ---- load + autosave ----------------------------------------------------
 
   useEffect(() => {
-    loadPage(id).then((p) => (p ? setPage(p) : router.back()));
+    loadPage(id).then((p) => {
+      if (!p) return router.back();
+      prunePhotos(p);
+      pageRef.current = p;
+      setPage(p);
+    });
   }, [id]);
 
   useEffect(() => {
@@ -61,7 +71,49 @@ export default function Editor() {
     return () => clearTimeout(t);
   }, [page]);
 
-  const update = useCallback((fn: (p: Page) => Page) => setPage((p) => (p ? fn(p) : p)), []);
+  // ---- edits + undo history ------------------------------------------------
+
+  const history = useRef({ past: [] as Page[], future: [] as Page[], gesture: false });
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
+  // `live` marks the many small updates of one drag or pinch: they share a
+  // single history entry, opened by beginGesture().
+  const update = useCallback((fn: (p: Page) => Page, live = false) => {
+    const p = pageRef.current;
+    if (!p) return;
+    const h = history.current;
+    if (!(live && h.gesture)) {
+      h.past.push(p);
+      if (h.past.length > MAX_HISTORY) h.past.shift();
+    }
+    h.gesture = live;
+    h.future.length = 0;
+    pageRef.current = fn(p);
+    setPage(pageRef.current);
+    setCanUndo(true);
+    setCanRedo(false);
+  }, []);
+
+  const beginGesture = useCallback(() => {
+    history.current.gesture = false;
+  }, []);
+
+  const travel = (from: Page[], to: Page[]) => {
+    const p = pageRef.current;
+    const next = from.pop();
+    if (!p || !next) return;
+    to.push(p);
+    history.current.gesture = false;
+    pageRef.current = next;
+    setPage(next);
+    setSel(null);
+    setCanUndo(history.current.past.length > 0);
+    setCanRedo(history.current.future.length > 0);
+    Haptics.selectionAsync().catch(() => {});
+  };
+  const undo = () => travel(history.current.past, history.current.future);
+  const redo = () => travel(history.current.future, history.current.past);
 
   // ---- photos -> manga ----------------------------------------------------
 
@@ -77,6 +129,8 @@ export default function Editor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photosKey]);
 
+  // Inked images are GPU work, so they are kept across renders by settings key.
+  /* eslint-disable react-hooks/refs -- render-time cache: same key, same image */
   const inkCache = useRef(new Map<string, SkImage>());
   const inksKey = page?.panels.map((p) => p.photo + JSON.stringify(p.ink)).join('|');
   const images = useMemo(() => {
@@ -94,15 +148,20 @@ export default function Editor() {
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inksKey, prepared]);
+  /* eslint-enable react-hooks/refs */
 
   // keep the library thumbnail fresh when leaving the editor
   const latest = useRef({ page, images, fonts });
-  latest.current = { page, images, fonts };
+  useEffect(() => {
+    latest.current = { page, images, fonts };
+  });
   useFocusEffect(
     useCallback(
       () => () => {
         const { page: p, images: imgs, fonts: f } = latest.current;
-        if (p && f && imgs.every(Boolean)) {
+        if (!p) return;
+        prunePhotos(p);
+        if (f && imgs.every(Boolean)) {
           savePage(p);
           renderPagePng(p, imgs, f).catch(() => {});
         }
@@ -130,12 +189,12 @@ export default function Editor() {
 
   const tap = () => Haptics.selectionAsync().catch(() => {});
 
-  const setPanel = (i: number, patch: Partial<Panel>) =>
-    update((p) => ({ ...p, panels: p.panels.map((x, j) => (j === i ? { ...x, ...patch } : x)) }));
+  const setPanel = (i: number, patch: Partial<Panel>, live = false) =>
+    update((p) => ({ ...p, panels: p.panels.map((x, j) => (j === i ? { ...x, ...patch } : x)) }), live);
   const setInk = (i: number, patch: Partial<InkParams>) => setPanel(i, { ink: { ...page.panels[i].ink, ...patch } });
 
-  const setItem = (itemId: string, patch: Partial<TextItem>) =>
-    update((p) => ({ ...p, items: p.items.map((x) => (x.id === itemId ? { ...x, ...patch } : x)) }));
+  const setItem = (itemId: string, patch: Partial<TextItem>, live = false) =>
+    update((p) => ({ ...p, items: p.items.map((x) => (x.id === itemId ? { ...x, ...patch } : x)) }), live);
 
   const addItem = (kind: TextKind) => {
     const target = sel?.type === 'panel' ? rects[sel.index] : null;
@@ -172,9 +231,13 @@ export default function Editor() {
   };
 
   const pickOne = async () => {
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.9 });
-    if (res.canceled || !res.assets[0]) return null;
-    return copyPhoto(page.id, res.assets[0].uri);
+    try {
+      const [uri] = await pickPhotos(1);
+      return uri ? await copyPhoto(page.id, uri) : null;
+    } catch (e) {
+      Alert.alert('Could not add the photo', String((e as Error)?.message ?? e));
+      return null;
+    }
   };
 
   const addPanel = async () => {
@@ -186,24 +249,20 @@ export default function Editor() {
     });
   };
 
+  // Replaced and removed photos stay on disk so undo can bring them back;
+  // prunePhotos() clears them when the editor closes.
   const replacePanel = async (i: number) => {
-    const old = page.panels[i].photo;
     const photo = await pickOne();
     if (!photo) return;
-    setPanel(i, { photo, focus: [0.5, 0.5] });
-    const f = photoFile(page.id, old);
-    if (f.exists && !page.panels.some((p, j) => j !== i && p.photo === old)) f.delete();
+    setPanel(i, { photo, focus: [0.5, 0.5], zoom: 1 });
   };
 
   const removePanel = (i: number) => {
-    const old = page.panels[i].photo;
     update((p) => {
       const panels = p.panels.filter((_, j) => j !== i);
       return { ...p, panels, layout: layoutsFor(panels.length)[0].id };
     });
     setSel(null);
-    const f = photoFile(page.id, old);
-    if (f.exists) f.delete();
   };
 
   const exportPage = async () => {
@@ -250,8 +309,11 @@ export default function Editor() {
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={s.topbar}>
         <Button label="‹ Library" variant="plain" onPress={() => router.back()} />
-        <Text style={s.topTitle}>Chapter {page.chapter}</Text>
-        <Button label="Export" variant="plain" onPress={exportPage} disabled={!ready || !!busy} />
+        <Row>
+          <Button label="Undo" variant="plain" onPress={undo} disabled={!canUndo} />
+          <Button label="Redo" variant="plain" onPress={redo} disabled={!canRedo} />
+          <Button label="Export" variant="plain" onPress={exportPage} disabled={!ready || !!busy} />
+        </Row>
       </View>
 
       <Pressable style={s.stage} onPress={() => setSel(null)} onLayout={(e) => setStage({ w: e.nativeEvent.layout.width - space(8), h: e.nativeEvent.layout.height - space(6) })}>
@@ -281,7 +343,9 @@ export default function Editor() {
                 selected={sel?.type === 'panel' && sel.index === i}
                 loading={!images[i]}
                 onSelect={() => setSel({ type: 'panel', index: i })}
-                onFocus={(focus) => setPanel(i, { focus })}
+                onBegin={beginGesture}
+                onFocus={(focus) => setPanel(i, { focus }, true)}
+                onZoom={(zoom) => setPanel(i, { zoom }, true)}
               />
             ))}
 
@@ -293,7 +357,8 @@ export default function Editor() {
                 scale={scale}
                 selected={sel?.type === 'item' && sel.id === item.id}
                 onSelect={() => setSel({ type: 'item', id: item.id })}
-                onMove={(x, y) => setItem(item.id, { x, y })}
+                onBegin={beginGesture}
+                onMove={(x, y) => setItem(item.id, { x, y }, true)}
               />
             ))}
           </View>
@@ -323,7 +388,7 @@ export default function Editor() {
               <Button label="Layout" onPress={cycleLayout} style={s.flex} disabled={layoutsFor(page.panels.length).length < 2} />
               {page.panels.length < MAX_PANELS && <Button label="Add photo" onPress={addPanel} style={s.flex} />}
             </Row>
-            <Text style={s.hint}>Tap a panel or text to edit. Drag to move.</Text>
+            <Text style={s.hint}>Tap a panel or text to edit. Drag to move, pinch a panel to zoom.</Text>
           </>
         )}
 
@@ -351,6 +416,7 @@ export default function Editor() {
             panel={page.panels[sel.index]}
             canRemove={page.panels.length > 1}
             onInk={(patch) => setInk(sel.index, patch)}
+            onZoom={(zoom) => setPanel(sel.index, { zoom })}
             onReplace={() => replacePanel(sel.index)}
             onRemove={() => removePanel(sel.index)}
             onAdd={addItem}
@@ -433,10 +499,13 @@ const TONES = [
   { id: 0.8, label: 'Heavy' },
 ];
 
+const ZOOMS = [1, 1.5, 2, MAX_ZOOM].map((id) => ({ id, label: `${id}×` }));
+
 function PanelTools({
   panel,
   canRemove,
   onInk,
+  onZoom,
   onReplace,
   onRemove,
   onAdd,
@@ -445,12 +514,14 @@ function PanelTools({
   panel: Panel;
   canRemove: boolean;
   onInk: (patch: Partial<InkParams>) => void;
+  onZoom: (zoom: number) => void;
   onReplace: () => void;
   onRemove: () => void;
   onAdd: (k: TextKind) => void;
   onDone: () => void;
 }) {
   const tone = TONES.reduce((a, b) => (Math.abs(b.id - panel.ink.ink) < Math.abs(a.id - panel.ink.ink) ? b : a)).id;
+  const zoom = ZOOMS.reduce((a, b) => (Math.abs(b.id - (panel.zoom || 1)) < Math.abs(a.id - (panel.zoom || 1)) ? b : a)).id;
   return (
     <>
       <Field label="Tone">
@@ -469,6 +540,9 @@ function PanelTools({
           value={panel.ink.fx}
           onChange={(fx) => onInk({ fx })}
         />
+      </Field>
+      <Field label="Zoom">
+        <Segmented options={ZOOMS} value={zoom} onChange={onZoom} />
       </Field>
       <Field label="Add to this panel">
         <Row>
@@ -494,7 +568,9 @@ function Done({ onPress }: { onPress: () => void }) {
 
 function useLatest<T>(v: T) {
   const r = useRef(v);
-  r.current = v;
+  useEffect(() => {
+    r.current = v;
+  });
   return r;
 }
 
@@ -506,7 +582,9 @@ function PanelHit({
   selected,
   loading,
   onSelect,
+  onBegin,
   onFocus,
+  onZoom,
 }: {
   rect: Rect;
   scale: number;
@@ -515,20 +593,37 @@ function PanelHit({
   selected: boolean;
   loading: boolean;
   onSelect: () => void;
+  onBegin: () => void;
   onFocus: (f: [number, number]) => void;
+  onZoom: (zoom: number) => void;
 }) {
-  const props = useLatest({ rect, scale, panel, prep, onSelect, onFocus });
+  const props = useLatest({ rect, scale, panel, prep, onSelect, onBegin, onFocus, onZoom });
   const start = useRef<[number, number]>([0.5, 0.5]);
+  // set once a second finger lands; the gesture is then a pinch until it ends
+  const pinch = useRef<{ dist: number; zoom: number } | null>(null);
   const responder = useMemo(
     () =>
+      // eslint-disable-next-line react-hooks/refs -- the handlers read the ref only when a touch arrives
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
+        onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: () => {
           start.current = props.current.panel?.focus ?? [0.5, 0.5];
+          pinch.current = null;
+          props.current.onBegin();
         },
-        onPanResponderMove: (_, g) => {
+        onPanResponderMove: (e, g) => {
           const { rect: r, scale: sc, panel: p, prep: pr } = props.current;
-          if (!p || !pr || Math.hypot(g.dx, g.dy) < TAP_SLOP) return;
+          if (!p || !pr) return;
+          const [a, b] = e.nativeEvent.touches;
+          if (a && b) {
+            const dist = Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY);
+            if (!pinch.current) pinch.current = { dist: Math.max(dist, 1), zoom: p.zoom || 1 };
+            const z = Math.max(1, Math.min(MAX_ZOOM, (pinch.current.zoom * dist) / pinch.current.dist));
+            if (Math.abs(z - (p.zoom || 1)) > 0.005) props.current.onZoom(z);
+            return;
+          }
+          if (pinch.current || Math.hypot(g.dx, g.dy) < TAP_SLOP) return;
           // drag the photo inside its frame: how far it can travel = overflow
           const s = Math.max(r.w / pr.width, r.h / pr.height) * (p.zoom || 1);
           const ox = pr.width * s - r.w;
@@ -538,7 +633,8 @@ function PanelHit({
           props.current.onFocus([clamp01(fx), clamp01(fy)]);
         },
         onPanResponderRelease: (_, g) => {
-          if (Math.hypot(g.dx, g.dy) < TAP_SLOP) props.current.onSelect();
+          if (!pinch.current && Math.hypot(g.dx, g.dy) < TAP_SLOP) props.current.onSelect();
+          else Haptics.selectionAsync().catch(() => {});
         },
       }),
     [props],
@@ -564,6 +660,7 @@ function ItemHit({
   scale,
   selected,
   onSelect,
+  onBegin,
   onMove,
 }: {
   item: TextItem;
@@ -571,17 +668,20 @@ function ItemHit({
   scale: number;
   selected: boolean;
   onSelect: () => void;
+  onBegin: () => void;
   onMove: (x: number, y: number) => void;
 }) {
   const L = layoutItem(item, fonts);
-  const props = useLatest({ item, scale, onSelect, onMove });
+  const props = useLatest({ item, scale, onSelect, onBegin, onMove });
   const start = useRef({ x: 0, y: 0 });
   const responder = useMemo(
     () =>
+      // eslint-disable-next-line react-hooks/refs -- the handlers read the ref only when a touch arrives
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
         onPanResponderGrant: () => {
           start.current = { x: props.current.item.x, y: props.current.item.y };
+          props.current.onBegin();
         },
         onPanResponderMove: (_, g) => {
           if (Math.hypot(g.dx, g.dy) < TAP_SLOP) return;
@@ -633,7 +733,6 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: space(2),
   },
-  topTitle: { fontFamily: font.medium, fontSize: 14, color: color.ink },
 
   stage: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   sheet: { backgroundColor: color.sheet, borderWidth: StyleSheet.hairlineWidth, borderColor: color.line },

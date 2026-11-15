@@ -64,6 +64,17 @@ export async function copyPhoto(id: string, uri: string): Promise<string> {
   return name;
 }
 
+// Deletes photo copies the page no longer uses. Removing or replacing a panel
+// keeps its file around so the change can be undone; this cleans up afterwards.
+export function prunePhotos(page: Page) {
+  const dir = pageDir(page.id);
+  if (!dir.exists) return;
+  const used = new Set(page.panels.map((p) => p.photo));
+  for (const entry of dir.list()) {
+    if (entry instanceof File && /^p.+\.jpg$/.test(entry.name) && !used.has(entry.name)) entry.delete();
+  }
+}
+
 // A fresh page with the photos in, a layout picked and a first line of text,
 // so the very first thing the user sees already looks like manga.
 export async function createPage(uris: string[], chapter: number): Promise<Page> {

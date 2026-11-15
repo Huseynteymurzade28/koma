@@ -1,4 +1,3 @@
-import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, FlatList, Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
@@ -6,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MAX_PANELS } from '@/page/layouts';
 import { createPage, deletePage, exportFile, listPages } from '@/page/store';
+import { pickPhotos } from '@/page/photos';
 import { PAGE_H, PAGE_W, type Page } from '@/page/types';
 import { color, font, space } from '@/theme';
 import { Button } from '@/ui/kit';
@@ -23,18 +23,12 @@ export default function Library() {
   );
 
   const newPage = async () => {
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: true,
-      selectionLimit: MAX_PANELS,
-      orderedSelection: true,
-      quality: 0.9,
-    });
-    if (res.canceled || res.assets.length === 0) return;
-    setCreating(true);
     try {
+      const uris = await pickPhotos(MAX_PANELS);
+      if (uris.length === 0) return;
+      setCreating(true);
       const chapter = (pages ?? []).reduce((m, p) => Math.max(m, p.chapter), 0) + 1;
-      const page = await createPage(res.assets.slice(0, MAX_PANELS).map((a) => a.uri), chapter);
+      const page = await createPage(uris, chapter);
       router.push({ pathname: '/page/[id]', params: { id: page.id } });
     } catch (e) {
       Alert.alert('Could not create the page', String((e as Error).message ?? e));
@@ -70,7 +64,7 @@ export default function Library() {
         <View style={s.empty}>
           <Text style={s.emptyTitle}>No chapters yet.</Text>
           <Text style={s.emptyBody}>
-            Pick up to four photos from your day.{'\n'}Koma turns them into a manga page.
+            Pick up to four photos from your day, or take one now.{'\n'}Koma turns them into a manga page.
           </Text>
         </View>
       ) : (
