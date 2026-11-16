@@ -7,21 +7,24 @@ import {
   TileMode,
   type SkImage,
   type SkRuntimeEffect,
+  type SkShader,
 } from '@shopify/react-native-skia';
 import { File } from 'expo-file-system';
 
 import { FLATTEN_SKSL, INK_SKSL } from './shaders';
-import { FX_CODE, statsFromPixels, thresholds, type InkParams, type ToneStats } from './tones';
+import { findSubject, type Subject } from './subject';
+import { BG_CODE, FX_CODE, statsFromPixels, thresholds, type InkParams, type ToneStats } from './tones';
 
 // Photo -> manga, on the GPU:
 //   1. decode + downscale        (once per photo)
 //   2. flatten (Kuwahara)        (once per photo)
 //   3. histogram -> tone stats   (once per photo)
+//   3b. subject mask             (once per photo, Android only, may be missing)
 //   4. ink pass                  (every time the panel's settings change; cheap)
 
 const MAX_SIDE = 1100;
 
-export type Prepared = { flat: SkImage; stats: ToneStats; width: number; height: number };
+export type Prepared = { flat: SkImage; stats: ToneStats; width: number; height: number; subject: Subject | null };
 
 let flattenFx: SkRuntimeEffect | null = null;
 let inkFx: SkRuntimeEffect | null = null;
@@ -33,12 +36,18 @@ function effects() {
   return { flattenFx, inkFx };
 }
 
-function pass(effect: SkRuntimeEffect, child: SkImage, uniforms: number[], w: number, h: number): SkImage {
+// `fitW` x `fitH` stretches the image to that size, for a mask that was made at another resolution
+function shaderOf(image: SkImage, fitW = image.width(), fitH = image.height()): SkShader {
+  const m = Skia.Matrix();
+  m.scale(fitW / image.width(), fitH / image.height());
+  return image.makeShaderOptions(TileMode.Clamp, TileMode.Clamp, FilterMode.Linear, MipmapMode.None, m);
+}
+
+function pass(effect: SkRuntimeEffect, children: SkShader[], uniforms: number[], w: number, h: number): SkImage {
   const surface = Skia.Surface.MakeOffscreen(w, h);
   if (!surface) throw new Error('Could not create offscreen surface');
-  const shader = child.makeShaderOptions(TileMode.Clamp, TileMode.Clamp, FilterMode.Linear, MipmapMode.None);
   const paint = Skia.Paint();
-  paint.setShader(effect.makeShaderWithChildren(uniforms, [shader]));
+  paint.setShader(effect.makeShaderWithChildren(uniforms, children));
   surface.getCanvas().drawRect(Skia.XYWHRect(0, 0, w, h), paint);
   surface.flush();
   return surface.makeImageSnapshot();
@@ -74,7 +83,7 @@ async function prepareUncached(uri: string): Promise<Prepared> {
   const resized = rs.makeImageSnapshot();
 
   const unit = width / 700;
-  const flat = pass(flattenFx, resized, [unit], width, height);
+  const flat = pass(flattenFx, [shaderOf(resized)], [unit], width, height);
 
   // Tone stats from a tiny copy — 96x96 is plenty for percentiles.
   const SM = 96;
@@ -90,15 +99,18 @@ async function prepareUncached(uri: string): Promise<Prepared> {
   });
   if (!px) throw new Error('Could not read pixels');
 
-  return { flat, stats: statsFromPixels(px), width, height };
+  return { flat, stats: statsFromPixels(px), width, height, subject: await findSubject(uri) };
 }
 
 export function renderInk(p: Prepared, ink: InkParams): SkImage {
   const { inkFx } = effects();
   const th = thresholds(p.stats, ink.ink);
+  const flat = shaderOf(p.flat);
+  // effect lines radiate from the subject when we know where it is
+  const center = p.subject?.center ?? ink.fxCenter;
   const out = pass(
     inkFx,
-    p.flat,
+    [flat, p.subject ? shaderOf(p.subject.mask, p.width, p.height) : flat],
     [
       p.width, p.height,
       p.width / 700,
@@ -106,7 +118,9 @@ export function renderInk(p: Prepared, ink: InkParams): SkImage {
       th.tLight, th.tDark, th.tBlack,
       ink.lines,
       FX_CODE[ink.fx],
-      ink.fxCenter[0], ink.fxCenter[1],
+      center[0], center[1],
+      p.subject ? 1 : 0,
+      BG_CODE[ink.bg ?? 'keep'],
     ],
     p.width,
     p.height,

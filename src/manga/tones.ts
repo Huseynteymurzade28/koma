@@ -36,7 +36,13 @@ export type InkParams = {
   lines: number; // 0..1, ink line strength
   fx: 'none' | 'focus' | 'speed';
   fxCenter: [number, number];
+  // what to do behind the subject; needs a subject mask, 'keep' when missing
+  bg?: Background;
 };
+
+export type Background = 'keep' | 'white' | 'black';
+
+export const BG_CODE = { keep: 0, white: 1, black: 2 } as const;
 
 export const DEFAULT_INK: InkParams = {
   ink: 0.5,

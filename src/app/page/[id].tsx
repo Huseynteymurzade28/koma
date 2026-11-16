@@ -18,7 +18,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { prepare, renderInk, type Prepared } from '@/manga/process';
-import { DEFAULT_INK, type InkParams } from '@/manga/tones';
+import { DEFAULT_INK, type Background, type InkParams } from '@/manga/tones';
 import { renderPagePng, saveToPhotos, sharePng } from '@/page/export';
 import { usePageFonts, type PageFonts } from '@/page/fonts';
 import { getLayout, layoutsFor, MAX_PANELS, panelRects, TITLE_H, MARGIN, type Rect } from '@/page/layouts';
@@ -450,6 +450,7 @@ export default function Editor() {
           <PanelTools
             panel={page.panels[sel.index]}
             canRemove={page.panels.length > 1}
+            hasSubject={!!prepared[page.panels[sel.index].photo]?.subject}
             canMoveBack={sel.index > 0}
             canMoveOn={sel.index < page.panels.length - 1}
             onMove={(by) => movePanel(sel.index, by)}
@@ -554,6 +555,12 @@ const TONES = [
 
 const ZOOMS = [1, 1.5, 2, MAX_ZOOM].map((id) => ({ id, label: `${id}×` }));
 
+const BACKGROUNDS: { id: Background; label: string }[] = [
+  { id: 'keep', label: 'Keep' },
+  { id: 'white', label: 'White' },
+  { id: 'black', label: 'Black' },
+];
+
 const SIZES = [
   { id: 0.75, label: 'Small' },
   { id: 1, label: 'Normal' },
@@ -567,6 +574,7 @@ const nearest = (options: { id: number }[], v: number) =>
 function PanelTools({
   panel,
   canRemove,
+  hasSubject,
   canMoveBack,
   canMoveOn,
   onMove,
@@ -579,6 +587,7 @@ function PanelTools({
 }: {
   panel: Panel;
   canRemove: boolean;
+  hasSubject: boolean;
   canMoveBack: boolean;
   canMoveOn: boolean;
   onMove: (by: -1 | 1) => void;
@@ -610,6 +619,11 @@ function PanelTools({
           onChange={(fx) => onInk({ fx })}
         />
       </Field>
+      {hasSubject && (
+        <Field label="Background">
+          <Segmented options={BACKGROUNDS} value={panel.ink.bg ?? 'keep'} onChange={(bg) => onInk({ bg })} />
+        </Field>
+      )}
       <Field label="Zoom">
         <Segmented options={ZOOMS} value={zoom} onChange={onZoom} />
       </Field>

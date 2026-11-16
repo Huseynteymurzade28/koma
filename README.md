@@ -13,6 +13,7 @@
 ## What it does
 
 - **Photo to manga.** Each photo is flattened, outlined with ink lines and shaded with halftone dots and hatching. Tone thresholds come from the photo's own histogram, so dark and bright shots both come out readable.
+- **Subject cut-out (Android).** Koma finds the person, animal or object in each photo on the device. A panel's background can then be kept, cleared to white or filled black, and focus and speed lines are drawn behind the subject and centred on it.
 - **Page layouts.** 13 layouts for one to four panels. Tap **Layout** to cycle through the ones that fit your photo count.
 - **Per-panel control.** Tone (light, medium, heavy), line strength (none, soft, bold), and focus or speed lines. Drag inside a panel to reframe the photo and pinch to zoom in, up to 3×. **Move earlier** and **Move later** swap a photo with its neighbour.
 - **Words.** Speech bubbles, thought bubbles, captions and SFX. Drag them anywhere, edit the text, pick one of four sizes, flip a bubble's tail to either side, duplicate one, or shuffle from a built-in word bank that follows the page's mood (action, drama, calm, comedy).
@@ -61,7 +62,9 @@ The pipeline lives in `src/manga/` and is written as two SkSL shaders run throug
 3. **Measure** the grey histogram on a 96 × 96 copy and derive percentile-based tone thresholds.
 4. **Ink.** An XDoG edge pass draws the lines, then three tone levels are filled in: dots, dots with hatching, and solid black. Focus and speed lines are drawn only on blank paper so the subject stays clear.
 
-Steps 1 to 3 run once per photo and are cached. Step 4 is cheap and reruns whenever a panel's settings change.
+On Android a fifth input joins step 4: a subject mask made by ML Kit's subject segmentation, through the small Kotlin module in `modules/koma-subject/`. Google Play services downloads the model, so the first photos after a fresh install may have no mask yet; those panels are drawn as before and the Background control stays hidden.
+
+Steps 1 to 3 and the mask run once per photo and are cached. Step 4 is cheap and reruns whenever a panel's settings change.
 
 ## Project layout
 
@@ -75,6 +78,8 @@ src/
   words/          word bank for titles, bubbles, captions and SFX
   ui/             shared controls
   theme.ts        colours, spacing, fonts
+modules/
+  koma-subject/   Android native module: subject mask with ML Kit
 tools/
   shader-harness/ run the shaders on the desktop
   page-harness/   render a whole page on the desktop
@@ -89,7 +94,7 @@ Both harnesses exist so the look can be tuned without a phone.
 Run the manga shaders on a single image (CPU, so it takes tens of seconds):
 
 ```bash
-npm run harness -- <in.png> <out.png> [ink 0..1] [fx 0|1|2]
+npm run harness -- <in.png> <out.png> [ink 0..1] [fx 0|1|2] [mask.png] [bg 0|1|2]
 npm run harness -- tools/shader-harness/samples/cat.png tools/shader-harness/out/cat.png 0.5 1
 ```
 

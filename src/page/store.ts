@@ -8,6 +8,7 @@ import type { Mood, Page, TextItem } from './types';
 // Each page lives in its own folder:
 //   pages/<id>/page.json   the editable model
 //   pages/<id>/p0.jpg ...  copies of the source photos
+//   pages/<id>/p0.jpg.mask.png  subject mask of a photo, made on first use
 //   pages/<id>/page.png    last export, also the library thumbnail
 
 const root = () => {
@@ -71,7 +72,9 @@ export function prunePhotos(page: Page) {
   if (!dir.exists) return;
   const used = new Set(page.panels.map((p) => p.photo));
   for (const entry of dir.list()) {
-    if (entry instanceof File && /^p.+\.jpg$/.test(entry.name) && !used.has(entry.name)) entry.delete();
+    if (!(entry instanceof File) || !/^p.+\.jpg(\.mask\.png)?$/.test(entry.name)) continue;
+    // a subject mask (see manga/subject.ts) lives and dies with its photo
+    if (!used.has(entry.name.replace(/\.mask\.png$/, ''))) entry.delete();
   }
 }
 

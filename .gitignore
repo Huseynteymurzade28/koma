@@ -42,3 +42,6 @@ yarn-error.*
 
 # shader harness output
 tools/shader-harness/out/
+
+# build output of local native modules
+/modules/*/android/build/

@@ -42,10 +42,14 @@ half4 main(float2 xy) {
 `;
 
 // Pass 2 — "ink": XDoG ink lines + quantised screentone + optional effect lines.
-// Input: flattened grey image. All thresholds are in that image's grey units
+// With a subject mask the background can also be cleared to paper or filled
+// black, and effect lines stay behind the subject.
+// Input: flattened grey image, and a subject mask scaled to the same size
+// (white = subject; pass any shader and hasMask = 0 when there is none). All thresholds are in that image's grey units
 // (computed from its percentiles), so every photo gets a balanced page.
 export const INK_SKSL = `
 uniform shader image;
+uniform shader mask;
 uniform float2 size;     // image size in px
 uniform float unit;      // px per "design pixel" (image width / 700)
 uniform float lo;        // grey levels used to normalise contrast
@@ -56,6 +60,10 @@ uniform float tBlack;    // below: solid black
 uniform float lines;     // 0..1 ink line strength
 uniform float fx;        // 0 none, 1 focus lines, 2 speed lines
 uniform float2 fxCenter; // 0..1, focus point
+uniform float hasMask;   // 1 when the mask shader is a real subject mask
+uniform float bg;        // 0 keep the background, 1 blank paper, 2 solid black
+
+float subject(float2 p) { return mask.eval(p).r; }
 
 float g(float2 p) { return image.eval(p).r; }
 
@@ -110,8 +118,18 @@ half4 main(float2 xy) {
   if (g2 < tDark) tone = dots(dp, 5.0, 2.0) * hatch(dp, 5.0, 1.6);
   if (g2 < tBlack) tone = 0.0;
 
-  // Effect lines only on blank paper so the subject stays readable
-  if (fx > 0.5 && g2 >= tLight) {
+  bool masked = hasMask > 0.5;
+  bool back = masked && subject(xy) < 0.5;
+  bool night = back && bg > 1.5;
+  if (back && bg > 0.5) {
+    tone = night ? 0.0 : 1.0;
+    ink = 1.0;
+  }
+
+  // Effect lines: behind the subject when it is known, otherwise only on
+  // blank paper so the subject stays readable
+  bool lineArea = masked ? (back && (bg > 0.5 || g2 >= tLight)) : g2 >= tLight;
+  if (fx > 0.5 && lineArea) {
     float lineInk = 0.0;
     if (fx < 1.5) {
       float2 c = fxCenter * size;
@@ -136,10 +154,21 @@ half4 main(float2 xy) {
       float w = clamp((len - x) / len, 0.0, 1.0) * 0.35 * (0.5 + 0.5 * hash(k + 5.0));
       lineInk = on * step(abs(f - 0.5), w);
     }
-    tone = min(tone, 1.0 - lineInk);
+    // on a black background the lines are cut out in white
+    tone = night ? lineInk : min(tone, 1.0 - lineInk);
   }
 
   float o = tone * ink;
+
+  // a contour around the subject once its background is gone
+  if (masked && bg > 0.5) {
+    float r = unit * 1.5;
+    float a = subject(xy + float2(r, 0.0));
+    float b = subject(xy - float2(r, 0.0));
+    float c = subject(xy + float2(0.0, r));
+    float e = subject(xy - float2(0.0, r));
+    if (min(min(a, b), min(c, e)) < 0.5 && max(max(a, b), max(c, e)) >= 0.5) o = bg > 1.5 ? 1.0 : 0.0;
+  }
   return half4(half3(o), 1.0);
 }
 `;
