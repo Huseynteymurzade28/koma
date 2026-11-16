@@ -13,6 +13,10 @@ export type TextItem = {
   y: number;
   // sfx only: degrees
   rotate?: number;
+  // drawn size relative to the default, 1 when missing
+  size?: number;
+  // bubble and thought: tail on the right instead of the left
+  flip?: boolean;
 };
 
 export type Panel = {

@@ -13,7 +13,7 @@ import {
 import { color } from '@/theme';
 import type { PageFonts } from './fonts';
 import { getLayout, panelRects, type Rect as R, TITLE_Y } from './layouts';
-import { layoutItem } from './textLayout';
+import { itemSize, layoutItem } from './textLayout';
 import { PAGE_H, PAGE_W, type Page, type Panel, type TextItem } from './types';
 
 // Pure drawing of a page in page units (1000 x 1414). The editor scales it to
@@ -109,8 +109,20 @@ function Lines({ item, fonts, cx, top }: { item: TextItem; fonts: PageFonts; cx:
 }
 
 function Item({ item, fonts }: { item: TextItem; fonts: PageFonts }) {
+  const k = itemSize(item);
+  if (k === 1) return <ItemShape item={item} fonts={fonts} />;
+  const { x, y } = item;
+  return (
+    <Group transform={[{ translateX: x }, { translateY: y }, { scale: k }, { translateX: -x }, { translateY: -y }]}>
+      <ItemShape item={item} fonts={fonts} />
+    </Group>
+  );
+}
+
+function ItemShape({ item, fonts }: { item: TextItem; fonts: PageFonts }) {
   const L = layoutItem(item, fonts);
   const { x, y } = item;
+  const d = item.flip ? -1 : 1; // which side the tail hangs on
   const left = x - L.w / 2;
   const top = y - L.h / 2;
   const textTop = y - (L.lines.length * L.lineH) / 2 - 2;
@@ -148,8 +160,8 @@ function Item({ item, fonts }: { item: TextItem; fonts: PageFonts }) {
   const oval = Skia.XYWHRect(left, top, L.w, L.h);
   if (item.kind === 'thought') {
     const dots = [
-      { cx: x - L.w * 0.18, cy: top + L.h + 16, r: 11 },
-      { cx: x - L.w * 0.26, cy: top + L.h + 42, r: 7 },
+      { cx: x - d * L.w * 0.18, cy: top + L.h + 16, r: 11 },
+      { cx: x - d * L.w * 0.26, cy: top + L.h + 42, r: 7 },
     ];
     return (
       <Group>
@@ -162,12 +174,12 @@ function Item({ item, fonts }: { item: TextItem; fonts: PageFonts }) {
     );
   }
 
-  const bx = x - L.w * 0.12;
+  const bx = x - d * L.w * 0.12;
   const tail = Skia.Path.Polygon(
     [
-      { x: bx - 16, y: top + L.h - 12 },
-      { x: bx + 16, y: top + L.h - 10 },
-      { x: bx - 34, y: top + L.h + 46 },
+      { x: bx - d * 16, y: top + L.h - 12 },
+      { x: bx + d * 16, y: top + L.h - 10 },
+      { x: bx - d * 34, y: top + L.h + 46 },
     ],
     true,
   );

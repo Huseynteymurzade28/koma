@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/icon.png" alt="Koma logo" width="128">
+  <img src="docs/logo.png" alt="Koma logo" width="176">
 </p>
 
 # Koma
@@ -14,8 +14,8 @@
 
 - **Photo to manga.** Each photo is flattened, outlined with ink lines and shaded with halftone dots and hatching. Tone thresholds come from the photo's own histogram, so dark and bright shots both come out readable.
 - **Page layouts.** 13 layouts for one to four panels. Tap **Layout** to cycle through the ones that fit your photo count.
-- **Per-panel control.** Tone (light, medium, heavy), line strength (none, soft, bold), and focus or speed lines. Drag inside a panel to reframe the photo and pinch to zoom in, up to 3×.
-- **Words.** Speech bubbles, thought bubbles, captions and SFX. Drag them anywhere, edit the text, or shuffle from a built-in word bank that follows the page's mood (action, drama, calm, comedy).
+- **Per-panel control.** Tone (light, medium, heavy), line strength (none, soft, bold), and focus or speed lines. Drag inside a panel to reframe the photo and pinch to zoom in, up to 3×. **Move earlier** and **Move later** swap a photo with its neighbour.
+- **Words.** Speech bubbles, thought bubbles, captions and SFX. Drag them anywhere, edit the text, pick one of four sizes, flip a bubble's tail to either side, duplicate one, or shuffle from a built-in word bank that follows the page's mood (action, drama, calm, comedy).
 - **Camera or library.** Take a photo on the spot or choose from your photos, when starting a page and when adding or replacing a panel.
 - **Undo and redo.** Every edit can be stepped back, including removed panels and deleted text.
 - **Chapters.** Every page gets a chapter number and a title, and is kept in a library on the device. Long-press a page to delete it.

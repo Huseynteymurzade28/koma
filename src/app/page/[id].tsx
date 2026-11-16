@@ -5,10 +5,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   KeyboardAvoidingView,
-  Modal,
   PanResponder,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -26,7 +25,7 @@ import { getLayout, layoutsFor, MAX_PANELS, panelRects, TITLE_H, MARGIN, type Re
 import { PageDrawing } from '@/page/PageDrawing';
 import { pickPhotos } from '@/page/photos';
 import { copyPhoto, loadPage, photoFile, prunePhotos, savePage, uid } from '@/page/store';
-import { layoutItem } from '@/page/textLayout';
+import { itemSize, layoutItem } from '@/page/textLayout';
 import { PAGE_H, PAGE_W, type Mood, type Page, type Panel, type TextItem, type TextKind } from '@/page/types';
 import { color, font, space } from '@/theme';
 import { Button, Field, Row, Segmented } from '@/ui/kit';
@@ -70,6 +69,17 @@ export default function Editor() {
     const t = setTimeout(() => savePage(page), 400);
     return () => clearTimeout(t);
   }, [page]);
+
+  // the text editor is an overlay, not a Modal, so Android back has to close it
+  const isEditing = !!editing;
+  useEffect(() => {
+    if (!isEditing) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      setEditing(null);
+      return true;
+    });
+    return () => sub.remove();
+  }, [isEditing]);
 
   // ---- edits + undo history ------------------------------------------------
 
@@ -210,6 +220,31 @@ export default function Editor() {
     };
     update((p) => ({ ...p, items: [...p.items, item] }));
     setSel({ type: 'item', id: item.id });
+    tap();
+  };
+
+  const duplicateItem = (src: TextItem) => {
+    const item: TextItem = {
+      ...src,
+      id: uid(),
+      x: Math.min(PAGE_W, src.x + 40),
+      y: Math.min(PAGE_H, src.y + 40),
+    };
+    update((p) => ({ ...p, items: [...p.items, item] }));
+    setSel({ type: 'item', id: item.id });
+    tap();
+  };
+
+  // swaps a panel with its neighbour; the layout stays, the photos trade places
+  const movePanel = (i: number, by: -1 | 1) => {
+    const j = i + by;
+    if (j < 0 || j >= page.panels.length) return;
+    update((p) => {
+      const panels = [...p.panels];
+      [panels[i], panels[j]] = [panels[j], panels[i]];
+      return { ...p, panels };
+    });
+    setSel({ type: 'panel', index: j });
     tap();
   };
 
@@ -415,6 +450,9 @@ export default function Editor() {
           <PanelTools
             panel={page.panels[sel.index]}
             canRemove={page.panels.length > 1}
+            canMoveBack={sel.index > 0}
+            canMoveOn={sel.index < page.panels.length - 1}
+            onMove={(by) => movePanel(sel.index, by)}
             onInk={(patch) => setInk(sel.index, patch)}
             onZoom={(zoom) => setPanel(sel.index, { zoom })}
             onReplace={() => replacePanel(sel.index)}
@@ -443,6 +481,18 @@ export default function Editor() {
                 onChange={(kind) => setItem(selectedItem.id, { kind, rotate: kind === 'sfx' ? (selectedItem.rotate ?? -8) : selectedItem.rotate })}
               />
             </Field>
+            <Field label="Size">
+              <Segmented options={SIZES} value={nearest(SIZES, itemSize(selectedItem))} onChange={(size) => setItem(selectedItem.id, { size })} />
+            </Field>
+            {(selectedItem.kind === 'bubble' || selectedItem.kind === 'thought') && (
+              <Field label="Tail">
+                <Segmented
+                  options={[{ id: 0, label: 'Left' }, { id: 1, label: 'Right' }]}
+                  value={selectedItem.flip ? 1 : 0}
+                  onChange={(v) => setItem(selectedItem.id, { flip: v === 1 })}
+                />
+              </Field>
+            )}
             {selectedItem.kind === 'sfx' && (
               <Field label="Tilt">
                 <Segmented
@@ -459,18 +509,21 @@ export default function Editor() {
                 onPress={() => { update((p) => ({ ...p, items: p.items.filter((i) => i.id !== selectedItem.id) })); setSel(null); }}
                 style={s.flex}
               />
+              <Button label="Duplicate" onPress={() => duplicateItem(selectedItem)} style={s.flex} />
               <Button label="Done" variant="solid" onPress={() => setSel(null)} style={s.flex} />
             </Row>
           </>
         )}
       </ScrollView>
 
-      <Modal visible={!!editing} transparent animationType="fade" onRequestClose={() => setEditing(null)}>
-        <KeyboardAvoidingView style={s.modalWrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* Android is edge-to-edge, so the window does not resize for the keyboard:
+          the sheet has to be padded above it on both platforms. */}
+      {editing && (
+        <KeyboardAvoidingView style={[StyleSheet.absoluteFill, s.modalWrap]} behavior="padding">
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setEditing(null)} />
           <View style={[s.modal, { paddingBottom: insets.bottom + space(4) }]}>
             <TextInput
-              value={editing?.text ?? ''}
+              value={editing.text}
               onChangeText={(text) => setEditing((e) => (e ? { ...e, text } : e))}
               style={s.input}
               multiline
@@ -486,7 +539,7 @@ export default function Editor() {
             </Row>
           </View>
         </KeyboardAvoidingView>
-      </Modal>
+      )}
     </View>
   );
 }
@@ -501,9 +554,22 @@ const TONES = [
 
 const ZOOMS = [1, 1.5, 2, MAX_ZOOM].map((id) => ({ id, label: `${id}×` }));
 
+const SIZES = [
+  { id: 0.75, label: 'Small' },
+  { id: 1, label: 'Normal' },
+  { id: 1.3, label: 'Large' },
+  { id: 1.7, label: 'Huge' },
+];
+
+const nearest = (options: { id: number }[], v: number) =>
+  options.reduce((a, b) => (Math.abs(b.id - v) < Math.abs(a.id - v) ? b : a)).id;
+
 function PanelTools({
   panel,
   canRemove,
+  canMoveBack,
+  canMoveOn,
+  onMove,
   onInk,
   onZoom,
   onReplace,
@@ -513,6 +579,9 @@ function PanelTools({
 }: {
   panel: Panel;
   canRemove: boolean;
+  canMoveBack: boolean;
+  canMoveOn: boolean;
+  onMove: (by: -1 | 1) => void;
   onInk: (patch: Partial<InkParams>) => void;
   onZoom: (zoom: number) => void;
   onReplace: () => void;
@@ -520,8 +589,8 @@ function PanelTools({
   onAdd: (k: TextKind) => void;
   onDone: () => void;
 }) {
-  const tone = TONES.reduce((a, b) => (Math.abs(b.id - panel.ink.ink) < Math.abs(a.id - panel.ink.ink) ? b : a)).id;
-  const zoom = ZOOMS.reduce((a, b) => (Math.abs(b.id - (panel.zoom || 1)) < Math.abs(a.id - (panel.zoom || 1)) ? b : a)).id;
+  const tone = nearest(TONES, panel.ink.ink);
+  const zoom = nearest(ZOOMS, panel.zoom || 1);
   return (
     <>
       <Field label="Tone">
@@ -544,6 +613,14 @@ function PanelTools({
       <Field label="Zoom">
         <Segmented options={ZOOMS} value={zoom} onChange={onZoom} />
       </Field>
+      {(canMoveBack || canMoveOn) && (
+        <Field label="Order">
+          <Row>
+            <Button label="‹ Move earlier" onPress={() => onMove(-1)} disabled={!canMoveBack} style={s.flex} />
+            <Button label="Move later ›" onPress={() => onMove(1)} disabled={!canMoveOn} style={s.flex} />
+          </Row>
+        </Field>
+      )}
       <Field label="Add to this panel">
         <Row>
           {(['bubble', 'thought', 'caption', 'sfx'] as TextKind[]).map((k) => (
@@ -699,16 +776,17 @@ function ItemHit({
     [props],
   );
   const pad = 6;
+  const k = itemSize(item);
   return (
     <View
       {...responder.panHandlers}
       style={[
         s.abs,
         {
-          left: (item.x - L.w / 2) * scale - pad,
-          top: (item.y - L.h / 2) * scale - pad,
-          width: L.w * scale + pad * 2,
-          height: L.h * scale + pad * 2,
+          left: (item.x - (L.w * k) / 2) * scale - pad,
+          top: (item.y - (L.h * k) / 2) * scale - pad,
+          width: L.w * k * scale + pad * 2,
+          height: L.h * k * scale + pad * 2,
         },
       ]}
     >
@@ -750,7 +828,7 @@ const s = StyleSheet.create({
   hint: { fontFamily: font.regular, fontSize: 12, color: color.muted, textAlign: 'center' },
   value: { fontFamily: font.semibold, fontSize: 16, color: color.ink, minWidth: 32, textAlign: 'center' },
 
-  modalWrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(18,18,18,0.25)' },
+  modalWrap: { justifyContent: 'flex-end', backgroundColor: 'rgba(18,18,18,0.25)' },
   modal: { backgroundColor: color.paper, padding: space(4), gap: space(3) },
   input: {
     fontFamily: font.regular,

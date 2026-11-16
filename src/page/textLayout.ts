@@ -32,6 +32,9 @@ export function wrap(font: SkFont, text: string, maxW: number) {
   return out;
 }
 
+// layoutItem() works at size 1; drawing and hit boxes scale by this around the centre
+export const itemSize = (item: TextItem) => item.size ?? 1;
+
 const MAX_W = { bubble: 250, thought: 240, caption: 320, sfx: 1000 } as const;
 
 export function layoutItem(item: TextItem, fonts: PageFonts): ItemLayout {
