@@ -18,20 +18,41 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { prepare, renderInk, type Prepared } from '@/manga/process';
-import { DEFAULT_INK, type Background, type InkParams } from '@/manga/tones';
+import { type Background, type InkParams } from '@/manga/tones';
 import { renderPagePng, saveToPhotos, sharePng } from '@/page/export';
+import { pageColor } from '@/page/colors';
 import { usePageFonts, type PageFonts } from '@/page/fonts';
-import { getLayout, layoutsFor, MAX_PANELS, panelRects, TITLE_H, MARGIN, type Rect } from '@/page/layouts';
+import { frameOf, layoutsFor, MAX_PANELS, MAX_SHEETS, sheetRects, TITLE_H, MARGIN, type Rect } from '@/page/layouts';
 import { PageDrawing } from '@/page/PageDrawing';
 import { pickPhotos } from '@/page/photos';
-import { copyPhoto, loadPage, photoFile, prunePhotos, savePage, uid } from '@/page/store';
+import { copyPhoto, loadPage, makeSheet, newPanel, photoFile, prunePhotos, savePage, uid } from '@/page/store';
 import { itemSize, layoutItem } from '@/page/textLayout';
-import { PAGE_H, PAGE_W, type Mood, type Page, type Panel, type TextItem, type TextKind } from '@/page/types';
-import { color, font, space } from '@/theme';
+import {
+  PAGE_H,
+  PAGE_W,
+  type Border,
+  type Frame,
+  type Gutter,
+  type Mood,
+  type Page,
+  type Panel,
+  type Sheet,
+  type TextItem,
+  type TextKind,
+} from '@/page/types';
+import { font, space, themed, usePalette } from '@/theme';
 import { Button, Field, Row, Segmented } from '@/ui/kit';
 import { KIND_LABEL, MOODS, randomLine, randomTitle } from '@/words/bank';
 
-type Selection = { type: 'panel'; index: number } | { type: 'item'; id: string } | { type: 'title' } | null;
+type Selection =
+  | { type: 'panel'; index: number }
+  | { type: 'item'; id: string }
+  | { type: 'title' }
+  | { type: 'sheet' } // the current page itself: its frame, order, removal
+  | null;
+
+// an undo step remembers which page it happened on, so undo can show it
+type Snapshot = { page: Page; at: number };
 
 const SELECT = '#E0452B';
 const TAP_SLOP = 6;
@@ -42,6 +63,8 @@ export default function Editor() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const fonts = usePageFonts();
+  const s = useStyles();
+  const color = usePalette();
 
   const [page, setPage] = useState<Page | null>(null);
   const [prepared, setPrepared] = useState<Record<string, Prepared>>({});
@@ -49,9 +72,17 @@ export default function Editor() {
   const [editing, setEditing] = useState<{ target: 'title' | string; text: string } | null>(null);
   const [stage, setStage] = useState({ w: 0, h: 0 });
   const [busy, setBusy] = useState<string | null>(null);
+  // which sheet of the chapter is on screen
+  const [atState, setAtState] = useState(0);
 
   // always the newest page, so several edits in one frame build on each other
   const pageRef = useRef<Page | null>(null);
+  const atRef = useRef(0);
+  const goTo = useCallback((i: number) => {
+    atRef.current = i;
+    setAtState(i);
+    setSel(null);
+  }, []);
 
   // ---- load + autosave ----------------------------------------------------
 
@@ -83,7 +114,7 @@ export default function Editor() {
 
   // ---- edits + undo history ------------------------------------------------
 
-  const history = useRef({ past: [] as Page[], future: [] as Page[], gesture: false });
+  const history = useRef({ past: [] as Snapshot[], future: [] as Snapshot[], gesture: false });
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
 
@@ -94,7 +125,7 @@ export default function Editor() {
     if (!p) return;
     const h = history.current;
     if (!(live && h.gesture)) {
-      h.past.push(p);
+      h.past.push({ page: p, at: atRef.current });
       if (h.past.length > MAX_HISTORY) h.past.shift();
     }
     h.gesture = live;
@@ -109,15 +140,15 @@ export default function Editor() {
     history.current.gesture = false;
   }, []);
 
-  const travel = (from: Page[], to: Page[]) => {
+  const travel = (from: Snapshot[], to: Snapshot[]) => {
     const p = pageRef.current;
     const next = from.pop();
     if (!p || !next) return;
-    to.push(p);
+    to.push({ page: p, at: next.at });
     history.current.gesture = false;
-    pageRef.current = next;
-    setPage(next);
-    setSel(null);
+    pageRef.current = next.page;
+    setPage(next.page);
+    goTo(Math.min(next.at, next.page.sheets.length - 1));
     setCanUndo(history.current.past.length > 0);
     setCanRedo(history.current.future.length > 0);
     Haptics.selectionAsync().catch(() => {});
@@ -127,10 +158,14 @@ export default function Editor() {
 
   // ---- photos -> manga ----------------------------------------------------
 
-  const photosKey = page?.panels.map((p) => p.photo).join('|');
+  // undo can drop the sheet we were on, so clamp rather than trust the index
+  const at = page ? Math.min(atState, page.sheets.length - 1) : 0;
+  const sheet: Sheet | undefined = page?.sheets[at];
+
+  const photosKey = sheet?.panels.map((p) => p.photo).join('|');
   useEffect(() => {
-    if (!page) return;
-    for (const panel of page.panels) {
+    if (!page || !sheet) return;
+    for (const panel of sheet.panels) {
       if (prepared[panel.photo]) continue;
       prepare(photoFile(page.id, panel.photo).uri)
         .then((p) => setPrepared((m) => ({ ...m, [panel.photo]: p })))
@@ -142,11 +177,11 @@ export default function Editor() {
   // Inked images are GPU work, so they are kept across renders by settings key.
   /* eslint-disable react-hooks/refs -- render-time cache: same key, same image */
   const inkCache = useRef(new Map<string, SkImage>());
-  const inksKey = page?.panels.map((p) => p.photo + JSON.stringify(p.ink)).join('|');
+  const inksKey = sheet?.panels.map((p) => p.photo + JSON.stringify(p.ink)).join('|');
   const images = useMemo(() => {
-    if (!page) return [];
+    if (!sheet) return [];
     const next = new Map<string, SkImage>();
-    const out = page.panels.map((panel) => {
+    const out = sheet.panels.map((panel) => {
       const prep = prepared[panel.photo];
       if (!prep) return null;
       const key = panel.photo + JSON.stringify(panel.ink);
@@ -161,19 +196,22 @@ export default function Editor() {
   /* eslint-enable react-hooks/refs */
 
   // keep the library thumbnail fresh when leaving the editor
-  const latest = useRef({ page, images, fonts });
+  const latest = useRef({ page, at, images, prepared, fonts });
   useEffect(() => {
-    latest.current = { page, images, fonts };
+    latest.current = { page, at, images, prepared, fonts };
   });
   useFocusEffect(
     useCallback(
       () => () => {
-        const { page: p, images: imgs, fonts: f } = latest.current;
+        const { page: p, at: i, images: imgs, prepared: prep, fonts: f } = latest.current;
         if (!p) return;
         prunePhotos(p);
-        if (f && imgs.every(Boolean)) {
-          savePage(p);
-          renderPagePng(p, imgs, f).catch(() => {});
+        savePage(p);
+        // the thumbnail is the first sheet, which may not be the one on screen
+        const first = p.sheets[0];
+        const thumb = i === 0 ? imgs : first.panels.map((x) => (prep[x.photo] ? renderInk(prep[x.photo], x.ink) : null));
+        if (f && thumb.length === first.panels.length && thumb.every(Boolean)) {
+          renderPagePng(p, 0, thumb, f).catch(() => {});
         }
       },
       [],
@@ -185,9 +223,9 @@ export default function Editor() {
   const scale = stage.w ? Math.min(stage.w / PAGE_W, stage.h / PAGE_H) : 0;
   const pageW = PAGE_W * scale;
   const pageH = PAGE_H * scale;
-  const rects = page ? panelRects(getLayout(page.layout, page.panels.length)) : [];
+  const rects = sheet ? sheetRects(sheet, at) : [];
 
-  if (!page || !fonts) {
+  if (!page || !sheet || !fonts) {
     return (
       <View style={[s.screen, s.center]}>
         <ActivityIndicator color={color.ink} />
@@ -199,12 +237,26 @@ export default function Editor() {
 
   const tap = () => Haptics.selectionAsync().catch(() => {});
 
+  // edits to the sheet on screen; the index is read when the edit runs
+  const updateSheet = (fn: (sh: Sheet) => Sheet, live = false) =>
+    update((p) => {
+      const i = Math.min(atRef.current, p.sheets.length - 1);
+      return { ...p, sheets: p.sheets.map((x, j) => (j === i ? fn(x) : x)) };
+    }, live);
+
   const setPanel = (i: number, patch: Partial<Panel>, live = false) =>
-    update((p) => ({ ...p, panels: p.panels.map((x, j) => (j === i ? { ...x, ...patch } : x)) }), live);
-  const setInk = (i: number, patch: Partial<InkParams>) => setPanel(i, { ink: { ...page.panels[i].ink, ...patch } });
+    updateSheet((sh) => ({ ...sh, panels: sh.panels.map((x, j) => (j === i ? { ...x, ...patch } : x)) }), live);
+  const setInk = (i: number, patch: Partial<InkParams>) => setPanel(i, { ink: { ...sheet.panels[i].ink, ...patch } });
 
   const setItem = (itemId: string, patch: Partial<TextItem>, live = false) =>
-    update((p) => ({ ...p, items: p.items.map((x) => (x.id === itemId ? { ...x, ...patch } : x)) }), live);
+    updateSheet((sh) => ({ ...sh, items: sh.items.map((x) => (x.id === itemId ? { ...x, ...patch } : x)) }), live);
+
+  const setFrame = (patch: Partial<Frame>, all = false) => {
+    const next = { ...frameOf(sheet), ...patch };
+    if (all) update((p) => ({ ...p, sheets: p.sheets.map((x) => ({ ...x, frame: next })) }));
+    else updateSheet((sh) => ({ ...sh, frame: next }));
+    tap();
+  };
 
   const addItem = (kind: TextKind) => {
     const target = sel?.type === 'panel' ? rects[sel.index] : null;
@@ -218,7 +270,7 @@ export default function Editor() {
       y,
       rotate: kind === 'sfx' ? -8 : undefined,
     };
-    update((p) => ({ ...p, items: [...p.items, item] }));
+    updateSheet((sh) => ({ ...sh, items: [...sh.items, item] }));
     setSel({ type: 'item', id: item.id });
     tap();
   };
@@ -230,7 +282,7 @@ export default function Editor() {
       x: Math.min(PAGE_W, src.x + 40),
       y: Math.min(PAGE_H, src.y + 40),
     };
-    update((p) => ({ ...p, items: [...p.items, item] }));
+    updateSheet((sh) => ({ ...sh, items: [...sh.items, item] }));
     setSel({ type: 'item', id: item.id });
     tap();
   };
@@ -238,11 +290,11 @@ export default function Editor() {
   // swaps a panel with its neighbour; the layout stays, the photos trade places
   const movePanel = (i: number, by: -1 | 1) => {
     const j = i + by;
-    if (j < 0 || j >= page.panels.length) return;
-    update((p) => {
-      const panels = [...p.panels];
+    if (j < 0 || j >= sheet.panels.length) return;
+    updateSheet((sh) => {
+      const panels = [...sh.panels];
       [panels[i], panels[j]] = [panels[j], panels[i]];
-      return { ...p, panels };
+      return { ...sh, panels };
     });
     setSel({ type: 'panel', index: j });
     tap();
@@ -253,15 +305,15 @@ export default function Editor() {
       ...p,
       mood,
       title: randomTitle(mood, p.title),
-      items: p.items.map((it) => ({ ...it, text: randomLine(it.kind, mood, it.text) })),
+      sheets: p.sheets.map((sh) => ({ ...sh, items: sh.items.map((it) => ({ ...it, text: randomLine(it.kind, mood, it.text) })) })),
     }));
     tap();
   };
 
   const cycleLayout = () => {
-    const ls = layoutsFor(page.panels.length);
-    const i = ls.findIndex((l) => l.id === page.layout);
-    update((p) => ({ ...p, layout: ls[(i + 1) % ls.length].id }));
+    const ls = layoutsFor(sheet.panels.length);
+    const i = ls.findIndex((l) => l.id === sheet.layout);
+    updateSheet((sh) => ({ ...sh, layout: ls[(i + 1) % ls.length].id }));
     tap();
   };
 
@@ -278,9 +330,9 @@ export default function Editor() {
   const addPanel = async () => {
     const photo = await pickOne();
     if (!photo) return;
-    update((p) => {
-      const panels = [...p.panels, { photo, ink: { ...DEFAULT_INK }, focus: [0.5, 0.5] as [number, number], zoom: 1 }];
-      return { ...p, panels, layout: layoutsFor(panels.length)[0].id };
+    updateSheet((sh) => {
+      const panels = [...sh.panels, newPanel(photo)];
+      return { ...sh, panels, layout: layoutsFor(panels.length)[0].id };
     });
   };
 
@@ -293,27 +345,103 @@ export default function Editor() {
   };
 
   const removePanel = (i: number) => {
-    update((p) => {
-      const panels = p.panels.filter((_, j) => j !== i);
-      return { ...p, panels, layout: layoutsFor(panels.length)[0].id };
+    updateSheet((sh) => {
+      const panels = sh.panels.filter((_, j) => j !== i);
+      return { ...sh, panels, layout: layoutsFor(panels.length)[0].id };
     });
     setSel(null);
   };
 
+  // ---- sheets ---------------------------------------------------------------
+
+  // a new sheet goes right after the one on screen and takes over its frame
+  const addSheet = async () => {
+    let photos: string[] = [];
+    try {
+      const uris = await pickPhotos(MAX_PANELS);
+      for (const uri of uris) photos.push(await copyPhoto(page.id, uri));
+    } catch (e) {
+      Alert.alert('Could not add the photos', String((e as Error)?.message ?? e));
+      photos = [];
+    }
+    if (photos.length === 0) return;
+    const i = atRef.current + 1;
+    update((p) => {
+      const sheets = [...p.sheets];
+      sheets.splice(i, 0, makeSheet(photos, p.mood, frameOf(p.sheets[i - 1]), false));
+      return { ...p, sheets };
+    });
+    goTo(i);
+    tap();
+  };
+
+  const moveSheet = (by: -1 | 1) => {
+    const i = at;
+    const j = i + by;
+    if (j < 0 || j >= page.sheets.length) return;
+    update((p) => {
+      const sheets = [...p.sheets];
+      [sheets[i], sheets[j]] = [sheets[j], sheets[i]];
+      return { ...p, sheets };
+    });
+    atRef.current = j;
+    setAtState(j);
+    tap();
+  };
+
+  const removeSheet = () =>
+    Alert.alert(`Delete page ${at + 1}?`, 'Its panels and text go with it. You can undo this.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          const i = at;
+          update((p) => ({ ...p, sheets: p.sheets.filter((_, j) => j !== i) }));
+          goTo(Math.max(0, i - 1));
+        },
+      },
+    ]);
+
+  const step = (by: -1 | 1) => {
+    const j = at + by;
+    if (j < 0 || j >= page.sheets.length) return;
+    goTo(j);
+    tap();
+  };
+
+  // inks a sheet that is not on screen, for export
+  const inkSheet = async (sh: Sheet) => {
+    const out: SkImage[] = [];
+    for (const panel of sh.panels) out.push(renderInk(await prepare(photoFile(page.id, panel.photo).uri), panel.ink));
+    return out;
+  };
+
   const exportPage = async () => {
     if (!images.every(Boolean)) return;
+    const n = page.sheets.length;
     setBusy('Rendering…');
     try {
       await savePage(page);
-      const uri = await renderPagePng(page, images, fonts);
+      const uris: string[] = [];
+      for (let i = 0; i < n; i++) {
+        if (n > 1) setBusy(`Rendering page ${i + 1} of ${n}…`);
+        const imgs = i === at ? images : await inkSheet(page.sheets[i]);
+        uris.push(await renderPagePng(page, i, imgs, fonts));
+      }
+      prunePhotos(page);
       setBusy(null);
-      Alert.alert('Page ready', `Chapter ${page.chapter} · ${page.title}`, [
+      const here = uris[at];
+      Alert.alert(n > 1 ? `${n} pages ready` : 'Page ready', `Chapter ${page.chapter} · ${page.title}`, [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Share', onPress: () => sharePng(uri).catch((e) => Alert.alert('Could not share', String(e?.message ?? e))) },
         {
-          text: 'Save to Photos',
+          text: n > 1 ? 'Share this page' : 'Share',
+          onPress: () => sharePng(here).catch((e) => Alert.alert('Could not share', String(e?.message ?? e))),
+        },
+        {
+          text: n > 1 ? `Save all ${n}` : 'Save to Photos',
           onPress: () =>
-            saveToPhotos(uri)
+            saveToPhotos(uris)
               .then(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}))
               .catch((e) => Alert.alert('Could not save', String(e?.message ?? e))),
         },
@@ -335,8 +463,10 @@ export default function Editor() {
     setEditing(null);
   };
 
-  const selectedItem = sel?.type === 'item' ? page.items.find((i) => i.id === sel.id) : undefined;
-  const ready = images.length === page.panels.length && images.every(Boolean);
+  const selectedItem = sel?.type === 'item' ? sheet.items.find((i) => i.id === sel.id) : undefined;
+  const ready = images.length === sheet.panels.length && images.every(Boolean);
+  const frame = frameOf(sheet);
+  const many = page.sheets.length > 1;
 
   // ---- render -------------------------------------------------------------
 
@@ -351,30 +481,44 @@ export default function Editor() {
         </Row>
       </View>
 
+      {many && (
+        <View style={s.pager}>
+          <Button label="‹" variant="plain" onPress={() => step(-1)} disabled={at === 0} style={s.square} />
+          <Pressable onPress={() => setSel({ type: 'sheet' })} hitSlop={8}>
+            <Text style={s.pagerText}>
+              Page {at + 1} of {page.sheets.length}
+            </Text>
+          </Pressable>
+          <Button label="›" variant="plain" onPress={() => step(1)} disabled={at === page.sheets.length - 1} style={s.square} />
+        </View>
+      )}
+
       <Pressable style={s.stage} onPress={() => setSel(null)} onLayout={(e) => setStage({ w: e.nativeEvent.layout.width - space(8), h: e.nativeEvent.layout.height - space(6) })}>
         {scale > 0 && (
           <View style={[s.sheet, { width: pageW, height: pageH }]}>
             <Canvas style={{ width: pageW, height: pageH }}>
               <Group transform={[{ scale }]}>
-                <PageDrawing page={page} images={images} fonts={fonts} />
+                <PageDrawing page={page} sheet={at} images={images} fonts={fonts} />
               </Group>
             </Canvas>
 
             {/* touch layer, in page units * scale */}
-            <Pressable
-              style={[s.abs, { left: 0, top: MARGIN * 0.4 * scale, width: pageW, height: (TITLE_H + MARGIN * 0.6) * scale }]}
-              onPress={() => setSel({ type: 'title' })}
-            >
-              {sel?.type === 'title' && <View style={[StyleSheet.absoluteFill, s.selBox]} />}
-            </Pressable>
+            {at === 0 && (
+              <Pressable
+                style={[s.abs, { left: 0, top: MARGIN * 0.4 * scale, width: pageW, height: (TITLE_H + MARGIN * 0.6) * scale }]}
+                onPress={() => setSel({ type: 'title' })}
+              >
+                {sel?.type === 'title' && <View style={[StyleSheet.absoluteFill, s.selBox]} />}
+              </Pressable>
+            )}
 
             {rects.map((r, i) => (
               <PanelHit
-                key={`${page.layout}-${i}`}
+                key={`${at}-${sheet.layout}-${i}`}
                 rect={r}
                 scale={scale}
-                panel={page.panels[i]}
-                prep={prepared[page.panels[i]?.photo]}
+                panel={sheet.panels[i]}
+                prep={prepared[sheet.panels[i]?.photo]}
                 selected={sel?.type === 'panel' && sel.index === i}
                 loading={!images[i]}
                 onSelect={() => setSel({ type: 'panel', index: i })}
@@ -384,7 +528,7 @@ export default function Editor() {
               />
             ))}
 
-            {page.items.map((item) => (
+            {sheet.items.map((item) => (
               <ItemHit
                 key={item.id}
                 item={item}
@@ -399,7 +543,7 @@ export default function Editor() {
           </View>
         )}
         {busy && (
-          <View style={[StyleSheet.absoluteFill, s.center, { backgroundColor: 'rgba(244,241,234,0.7)' }]}>
+          <View style={[StyleSheet.absoluteFill, s.center, { backgroundColor: color.veil }]}>
             <Text style={s.busy}>{busy}</Text>
           </View>
         )}
@@ -420,11 +564,27 @@ export default function Editor() {
             </Field>
             <Row>
               <Button label="Shuffle words" onPress={() => shuffleAll()} style={s.flex} />
-              <Button label="Layout" onPress={cycleLayout} style={s.flex} disabled={layoutsFor(page.panels.length).length < 2} />
-              {page.panels.length < MAX_PANELS && <Button label="Add photo" onPress={addPanel} style={s.flex} />}
+              <Button label="Layout" onPress={cycleLayout} style={s.flex} disabled={layoutsFor(sheet.panels.length).length < 2} />
+              {sheet.panels.length < MAX_PANELS && <Button label="Add photo" onPress={addPanel} style={s.flex} />}
+            </Row>
+            <Row>
+              <Button label="Page style" onPress={() => setSel({ type: 'sheet' })} style={s.flex} />
+              <Button label="New page" onPress={addSheet} style={s.flex} disabled={page.sheets.length >= MAX_SHEETS} />
             </Row>
             <Text style={s.hint}>Tap a panel or text to edit. Drag to move, pinch a panel to zoom.</Text>
           </>
+        )}
+
+        {sel?.type === 'sheet' && (
+          <SheetTools
+            frame={frame}
+            index={at}
+            count={page.sheets.length}
+            onFrame={setFrame}
+            onMove={moveSheet}
+            onRemove={removeSheet}
+            onDone={() => setSel(null)}
+          />
         )}
 
         {sel?.type === 'title' && (
@@ -446,13 +606,13 @@ export default function Editor() {
           </>
         )}
 
-        {sel?.type === 'panel' && page.panels[sel.index] && (
+        {sel?.type === 'panel' && sheet.panels[sel.index] && (
           <PanelTools
-            panel={page.panels[sel.index]}
-            canRemove={page.panels.length > 1}
-            hasSubject={!!prepared[page.panels[sel.index].photo]?.subject}
+            panel={sheet.panels[sel.index]}
+            canRemove={sheet.panels.length > 1}
+            hasSubject={!!prepared[sheet.panels[sel.index].photo]?.subject}
             canMoveBack={sel.index > 0}
-            canMoveOn={sel.index < page.panels.length - 1}
+            canMoveOn={sel.index < sheet.panels.length - 1}
             onMove={(by) => movePanel(sel.index, by)}
             onInk={(patch) => setInk(sel.index, patch)}
             onZoom={(zoom) => setPanel(sel.index, { zoom })}
@@ -507,7 +667,7 @@ export default function Editor() {
               <Button
                 label="Delete"
                 danger
-                onPress={() => { update((p) => ({ ...p, items: p.items.filter((i) => i.id !== selectedItem.id) })); setSel(null); }}
+                onPress={() => { updateSheet((sh) => ({ ...sh, items: sh.items.filter((i) => i.id !== selectedItem.id) })); setSel(null); }}
                 style={s.flex}
               />
               <Button label="Duplicate" onPress={() => duplicateItem(selectedItem)} style={s.flex} />
@@ -542,6 +702,78 @@ export default function Editor() {
         </KeyboardAvoidingView>
       )}
     </View>
+  );
+}
+
+// ---- sheet tools ------------------------------------------------------------
+
+const GUTTER_OPTIONS: { id: Gutter; label: string }[] = [
+  { id: 'tight', label: 'Tight' },
+  { id: 'normal', label: 'Normal' },
+  { id: 'wide', label: 'Wide' },
+];
+
+const BORDER_OPTIONS: { id: Border; label: string }[] = [
+  { id: 'none', label: 'None' },
+  { id: 'thin', label: 'Thin' },
+  { id: 'normal', label: 'Normal' },
+  { id: 'bold', label: 'Bold' },
+];
+
+function SheetTools({
+  frame,
+  index,
+  count,
+  onFrame,
+  onMove,
+  onRemove,
+  onDone,
+}: {
+  frame: Frame;
+  index: number;
+  count: number;
+  onFrame: (patch: Partial<Frame>, all?: boolean) => void;
+  onMove: (by: -1 | 1) => void;
+  onRemove: () => void;
+  onDone: () => void;
+}) {
+  const s = useStyles();
+  return (
+    <>
+      <Field label="Gutter">
+        <Segmented options={GUTTER_OPTIONS} value={frame.gutter} onChange={(gutter) => onFrame({ gutter })} />
+      </Field>
+      <Field label="Panel border">
+        <Segmented options={BORDER_OPTIONS} value={frame.border} onChange={(border) => onFrame({ border })} />
+      </Field>
+      <Field label="Paper">
+        <Segmented
+          options={[{ id: 0, label: 'White' }, { id: 1, label: 'Black' }]}
+          value={frame.dark ? 1 : 0}
+          onChange={(v) => onFrame({ dark: v === 1 })}
+        />
+      </Field>
+      <Field label="Edges">
+        <Segmented
+          options={[{ id: 0, label: 'Margin' }, { id: 1, label: 'Bleed' }]}
+          value={frame.bleed ? 1 : 0}
+          onChange={(v) => onFrame({ bleed: v === 1 })}
+        />
+      </Field>
+      {count > 1 && (
+        <>
+          <Button label="Use this style on every page" onPress={() => onFrame({}, true)} />
+          <Field label={`Page ${index + 1} of ${count}`}>
+            <Row>
+              <Button label="‹ Earlier" onPress={() => onMove(-1)} disabled={index === 0} style={s.flex} />
+              <Button label="Later ›" onPress={() => onMove(1)} disabled={index === count - 1} style={s.flex} />
+              <Button label="Delete" danger onPress={onRemove} style={s.flex} />
+            </Row>
+          </Field>
+        </>
+      )}
+      <Done onPress={onDone} />
+    </>
   );
 }
 
@@ -598,6 +830,7 @@ function PanelTools({
   onAdd: (k: TextKind) => void;
   onDone: () => void;
 }) {
+  const s = useStyles();
   const tone = nearest(TONES, panel.ink.ink);
   const zoom = nearest(ZOOMS, panel.zoom || 1);
   return (
@@ -688,6 +921,7 @@ function PanelHit({
   onFocus: (f: [number, number]) => void;
   onZoom: (zoom: number) => void;
 }) {
+  const s = useStyles();
   const props = useLatest({ rect, scale, panel, prep, onSelect, onBegin, onFocus, onZoom });
   const start = useRef<[number, number]>([0.5, 0.5]);
   // set once a second finger lands; the gesture is then a pinch until it ends
@@ -762,6 +996,7 @@ function ItemHit({
   onBegin: () => void;
   onMove: (x: number, y: number) => void;
 }) {
+  const s = useStyles();
   const L = layoutItem(item, fonts);
   const props = useLatest({ item, scale, onSelect, onBegin, onMove });
   const start = useRef({ x: 0, y: 0 });
@@ -811,7 +1046,7 @@ function ItemHit({
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
-const s = StyleSheet.create({
+const useStyles = themed((color) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: color.paper },
   center: { alignItems: 'center', justifyContent: 'center' },
   flex: { flex: 1, paddingHorizontal: space(1) },
@@ -826,8 +1061,11 @@ const s = StyleSheet.create({
     paddingHorizontal: space(2),
   },
 
+  pager: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space(2), height: 36 },
+  pagerText: { fontFamily: font.medium, fontSize: 13, color: color.ink, letterSpacing: 0.2 },
+
   stage: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  sheet: { backgroundColor: color.sheet, borderWidth: StyleSheet.hairlineWidth, borderColor: color.line },
+  sheet: { backgroundColor: pageColor.sheet, borderWidth: StyleSheet.hairlineWidth, borderColor: color.line },
   selBox: { borderWidth: 2, borderColor: SELECT },
   drawing: { fontFamily: font.medium, fontSize: 12, color: color.muted },
   busy: { fontFamily: font.medium, fontSize: 14, color: color.ink },
@@ -842,7 +1080,7 @@ const s = StyleSheet.create({
   hint: { fontFamily: font.regular, fontSize: 12, color: color.muted, textAlign: 'center' },
   value: { fontFamily: font.semibold, fontSize: 16, color: color.ink, minWidth: 32, textAlign: 'center' },
 
-  modalWrap: { justifyContent: 'flex-end', backgroundColor: 'rgba(18,18,18,0.25)' },
+  modalWrap: { justifyContent: 'flex-end', backgroundColor: color.scrim },
   modal: { backgroundColor: color.paper, padding: space(4), gap: space(3) },
   input: {
     fontFamily: font.regular,
@@ -854,4 +1092,4 @@ const s = StyleSheet.create({
     padding: space(3),
     textAlignVertical: 'top',
   },
-});
+}));

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { color, font, space } from '@/theme';
+import { font, space, themed, usePalette } from '@/theme';
 
 type ButtonProps = {
   label: string;
@@ -13,6 +13,8 @@ type ButtonProps = {
 };
 
 export function Button({ label, onPress, variant = 'outline', disabled, style, danger }: ButtonProps) {
+  const s = useStyles();
+  const color = usePalette();
   return (
     <Pressable
       onPress={onPress}
@@ -31,7 +33,7 @@ export function Button({ label, onPress, variant = 'outline', disabled, style, d
       <Text
         style={[
           s.btnText,
-          variant === 'solid' && { color: color.sheet },
+          variant === 'solid' && { color: color.onInk },
           danger && { color: color.danger },
         ]}
         numberOfLines={1}
@@ -49,6 +51,8 @@ type SegmentedProps<T extends string | number> = {
 };
 
 export function Segmented<T extends string | number>({ options, value, onChange }: SegmentedProps<T>) {
+  const s = useStyles();
+  const color = usePalette();
   return (
     <View style={s.seg}>
       {options.map((o, i) => {
@@ -59,7 +63,7 @@ export function Segmented<T extends string | number>({ options, value, onChange 
             onPress={() => onChange(o.id)}
             style={[s.segItem, i > 0 && s.segDivider, on && s.segOn]}
           >
-            <Text style={[s.segText, on && { color: color.sheet }]} numberOfLines={1}>
+            <Text style={[s.segText, on && { color: color.onInk }]} numberOfLines={1}>
               {o.label}
             </Text>
           </Pressable>
@@ -70,6 +74,7 @@ export function Segmented<T extends string | number>({ options, value, onChange 
 }
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
+  const s = useStyles();
   return (
     <View style={s.field}>
       <Text style={s.label}>{label}</Text>
@@ -79,10 +84,11 @@ export function Field({ label, children }: { label: string; children: ReactNode 
 }
 
 export function Row({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  const s = useStyles();
   return <View style={[s.row, style]}>{children}</View>;
 }
 
-const s = StyleSheet.create({
+const useStyles = themed((color) => StyleSheet.create({
   btn: {
     height: 40,
     paddingHorizontal: space(4),
@@ -116,4 +122,4 @@ const s = StyleSheet.create({
     color: color.muted,
   },
   row: { flexDirection: 'row', gap: space(2), alignItems: 'center' },
-});
+}));

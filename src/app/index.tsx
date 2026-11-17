@@ -3,14 +3,19 @@ import { useCallback, useState } from 'react';
 import { Alert, FlatList, Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MAX_PANELS } from '@/page/layouts';
+import { MAX_PANELS, MAX_SHEETS } from '@/page/layouts';
 import { createPage, deletePage, exportFile, listPages } from '@/page/store';
 import { pickPhotos } from '@/page/photos';
 import { PAGE_H, PAGE_W, type Page } from '@/page/types';
-import { color, font, space } from '@/theme';
+import { pageColor } from '@/page/colors';
+import { font, space, themed } from '@/theme';
 import { Button } from '@/ui/kit';
 
+// photos a new chapter can start with; more than fit one page are spread over several
+const MAX_START_PHOTOS = 12;
+
 export default function Library() {
+  const s = useStyles();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [pages, setPages] = useState<Page[] | null>(null);
@@ -24,7 +29,7 @@ export default function Library() {
 
   const newPage = async () => {
     try {
-      const uris = await pickPhotos(MAX_PANELS);
+      const uris = await pickPhotos(Math.min(MAX_START_PHOTOS, MAX_PANELS * MAX_SHEETS));
       if (uris.length === 0) return;
       setCreating(true);
       const chapter = (pages ?? []).reduce((m, p) => Math.max(m, p.chapter), 0) + 1;
@@ -64,7 +69,7 @@ export default function Library() {
         <View style={s.empty}>
           <Text style={s.emptyTitle}>No chapters yet.</Text>
           <Text style={s.emptyBody}>
-            Pick up to four photos from your day, or take one now.{'\n'}Koma turns them into a manga page.
+            Pick photos from your day, or take one now.{'\n'}Koma turns them into manga pages.
           </Text>
         </View>
       ) : (
@@ -88,6 +93,8 @@ export default function Library() {
 }
 
 function PageCard({ page, width, onPress, onLongPress }: { page: Page; width: number; onPress: () => void; onLongPress: () => void }) {
+  const s = useStyles();
+  const n = page.sheets.length;
   const thumb = exportFile(page.id);
   const h = (width * PAGE_H) / PAGE_W;
   return (
@@ -103,6 +110,7 @@ function PageCard({ page, width, onPress, onLongPress }: { page: Page; width: nu
       </View>
       <Text style={s.meta}>
         Ch. {page.chapter} · {new Date(page.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+        {n > 1 ? ` · ${n} pages` : ''}
       </Text>
       <Text style={s.cardTitle} numberOfLines={1}>
         {page.title}
@@ -111,7 +119,7 @@ function PageCard({ page, width, onPress, onLongPress }: { page: Page; width: nu
   );
 }
 
-const s = StyleSheet.create({
+const useStyles = themed((color) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: color.paper },
   header: { paddingHorizontal: space(5), paddingBottom: space(6) },
   wordmark: { fontFamily: font.display, fontSize: 44, color: color.ink, letterSpacing: 1 },
@@ -122,14 +130,14 @@ const s = StyleSheet.create({
   emptyBody: { fontFamily: font.regular, fontSize: 15, lineHeight: 22, color: color.muted },
 
   thumb: {
-    backgroundColor: color.sheet,
+    backgroundColor: pageColor.sheet,
     borderWidth: 1,
     borderColor: color.line,
     justifyContent: 'center',
     padding: space(3),
     overflow: 'hidden',
   },
-  thumbTitle: { fontFamily: font.display, fontSize: 22, color: color.ink, textAlign: 'center' },
+  thumbTitle: { fontFamily: font.display, fontSize: 22, color: pageColor.ink, textAlign: 'center' },
   meta: { fontFamily: font.regular, fontSize: 12, color: color.muted, marginTop: space(2) },
   cardTitle: { fontFamily: font.medium, fontSize: 14, color: color.ink, marginTop: 2 },
 
@@ -145,4 +153,4 @@ const s = StyleSheet.create({
     borderTopColor: color.line,
   },
   cta: { height: 52 },
-});
+}));

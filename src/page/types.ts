@@ -27,6 +27,31 @@ export type Panel = {
   zoom: number; // 1 = cover
 };
 
+export type Gutter = 'tight' | 'normal' | 'wide';
+export type Border = 'none' | 'thin' | 'normal' | 'bold';
+
+// How the panels sit on the sheet
+export type Frame = {
+  gutter: Gutter;
+  border: Border;
+  // black paper, as for flashbacks; borders and title turn white
+  dark: boolean;
+  // panels run to the edge of the paper, no outer margin
+  bleed: boolean;
+};
+
+export const DEFAULT_FRAME: Frame = { gutter: 'normal', border: 'normal', dark: false, bleed: false };
+
+// One drawn page of a chapter. The first sheet carries the chapter title.
+export type Sheet = {
+  layout: string; // layout id, see layouts.ts
+  panels: Panel[];
+  items: TextItem[];
+  frame?: Frame; // DEFAULT_FRAME when missing
+};
+
+// A chapter: what the library lists and what lives in pages/<id>/.
+// Called Page for history: chapters used to be a single page.
 export type Page = {
   id: string;
   createdAt: number;
@@ -34,9 +59,7 @@ export type Page = {
   chapter: number;
   title: string;
   mood: Mood;
-  layout: string; // layout id, see layouts.ts
-  panels: Panel[];
-  items: TextItem[];
+  sheets: Sheet[];
 };
 
 export const PAGE_W = 1000;

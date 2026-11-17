@@ -10,9 +10,9 @@ import {
   type SkImage,
 } from '@shopify/react-native-skia';
 
-import { color } from '@/theme';
+import { pageColor } from './colors';
 import type { PageFonts } from './fonts';
-import { getLayout, panelRects, type Rect as R, TITLE_Y } from './layouts';
+import { BORDERS, frameOf, MARGIN, sheetRects, type Rect as R, TITLE_Y } from './layouts';
 import { itemSize, layoutItem } from './textLayout';
 import { PAGE_H, PAGE_W, type Page, type Panel, type TextItem } from './types';
 
@@ -21,31 +21,45 @@ import { PAGE_H, PAGE_W, type Page, type Panel, type TextItem } from './types';
 
 type Props = {
   page: Page;
-  images: (SkImage | null)[];
+  sheet: number; // which sheet of the chapter to draw
+  images: (SkImage | null)[]; // inked photos of that sheet's panels
   fonts: PageFonts;
 };
 
-const INK = color.ink;
-const PAPER = color.sheet;
-const BORDER = 6;
+const INK = pageColor.ink;
+const PAPER = pageColor.sheet;
 
-export function PageDrawing({ page, images, fonts }: Props) {
-  const rects = panelRects(getLayout(page.layout, page.panels.length));
+export function PageDrawing({ page, sheet: index, images, fonts }: Props) {
+  const sheet = page.sheets[index];
+  if (!sheet) return null;
+  const frame = frameOf(sheet);
+  const rects = sheetRects(sheet, index);
+  // on black paper the frame and lettering outside the panels turn white
+  const paper = frame.dark ? INK : PAPER;
+  const line = frame.dark ? PAPER : INK;
+  const showNumber = page.sheets.length > 1 && !frame.bleed;
   return (
     <Group>
-      <Rect x={0} y={0} width={PAGE_W} height={PAGE_H} color={PAPER} />
-      <Title page={page} fonts={fonts} />
+      <Rect x={0} y={0} width={PAGE_W} height={PAGE_H} color={paper} />
+      {index === 0 && <Title page={page} fonts={fonts} color={line} />}
       {rects.map((r, i) => (
-        <PanelBox key={i} rect={r} panel={page.panels[i]} image={images[i] ?? null} />
+        <PanelBox key={i} rect={r} panel={sheet.panels[i]} image={images[i] ?? null} border={BORDERS[frame.border]} color={line} />
       ))}
-      {page.items.map((item) => (
+      {sheet.items.map((item) => (
         <Item key={item.id} item={item} fonts={fonts} />
       ))}
+      {showNumber && <PageNumber n={index + 1} fonts={fonts} color={frame.dark ? PAPER : pageColor.muted} />}
     </Group>
   );
 }
 
-function Title({ page, fonts }: { page: Page; fonts: PageFonts }) {
+function PageNumber({ n, fonts, color }: { n: number; fonts: PageFonts; color: string }) {
+  const text = String(n);
+  const w = fonts.chapter.measureText(text).width;
+  return <Text x={(PAGE_W - w) / 2} y={PAGE_H - MARGIN / 2 + 7} text={text} font={fonts.chapter} color={color} />;
+}
+
+function Title({ page, fonts, color }: { page: Page; fonts: PageFonts; color: string }) {
   const chapter = `CHAPTER ${page.chapter}`;
   const title = page.title.toUpperCase();
   const cw = fonts.chapter.measureText(chapter).width;
@@ -55,15 +69,17 @@ function Title({ page, fonts }: { page: Page; fonts: PageFonts }) {
   const s = tw > max ? max / tw : 1;
   return (
     <Group>
-      <Text x={(PAGE_W - cw) / 2} y={TITLE_Y - 26} text={chapter} font={fonts.chapter} color={color.muted} />
+      <Text x={(PAGE_W - cw) / 2} y={TITLE_Y - 26} text={chapter} font={fonts.chapter} color={color === INK ? pageColor.muted : color} />
       <Group transform={[{ translateX: PAGE_W / 2 }, { scale: s }, { translateX: -tw / 2 }]}>
-        <Text x={0} y={TITLE_Y + 30} text={title} font={fonts.title} color={INK} />
+        <Text x={0} y={TITLE_Y + 30} text={title} font={fonts.title} color={color} />
       </Group>
     </Group>
   );
 }
 
-function PanelBox({ rect, panel, image }: { rect: R; panel: Panel | undefined; image: SkImage | null }) {
+type PanelProps = { rect: R; panel: Panel | undefined; image: SkImage | null; border: number; color: string };
+
+function PanelBox({ rect, panel, image, border, color }: PanelProps) {
   const clip = Skia.XYWHRect(rect.x, rect.y, rect.w, rect.h);
   let img = null;
   if (image && panel) {
@@ -83,15 +99,9 @@ function PanelBox({ rect, panel, image }: { rect: R; panel: Panel | undefined; i
         <Rect x={rect.x} y={rect.y} width={rect.w} height={rect.h} color="#E9E6DE" />
         {img}
       </Group>
-      <Rect
-        x={rect.x}
-        y={rect.y}
-        width={rect.w}
-        height={rect.h}
-        color={INK}
-        style="stroke"
-        strokeWidth={BORDER}
-      />
+      {border > 0 && (
+        <Rect x={rect.x} y={rect.y} width={rect.w} height={rect.h} color={color} style="stroke" strokeWidth={border} />
+      )}
     </Group>
   );
 }

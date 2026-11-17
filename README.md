@@ -4,7 +4,7 @@
 
 # Koma
 
-**Your days, drawn as manga.** Pick or shoot up to four photos and Koma inks them into a black-and-white manga page, with panels, screentone, speech bubbles and sound effects. Everything runs on the phone's GPU; no photo ever leaves the device.
+**Your days, drawn as manga.** Pick or shoot photos and Koma inks them into black-and-white manga pages, with panels, screentone, speech bubbles and sound effects. Everything runs on the phone's GPU; no photo ever leaves the device.
 
 <p align="center">
   <img src="docs/sample-page.png" alt="A three-panel manga page made by Koma" width="360">
@@ -14,13 +14,16 @@
 
 - **Photo to manga.** Each photo is flattened, outlined with ink lines and shaded with halftone dots and hatching. Tone thresholds come from the photo's own histogram, so dark and bright shots both come out readable.
 - **Subject cut-out (Android).** Koma finds the person, animal or object in each photo on the device. A panel's background can then be kept, cleared to white or filled black, and focus and speed lines are drawn behind the subject and centred on it.
-- **Page layouts.** 13 layouts for one to four panels. Tap **Layout** to cycle through the ones that fit your photo count.
+- **Page layouts.** 19 layouts for one to six panels. Tap **Layout** to cycle through the ones that fit your photo count.
+- **Multi-page chapters.** A chapter can hold up to 12 pages. Start one with up to 12 photos and Koma spreads them over as few pages as fit, or tap **New page** to add one after the current page. Step between pages with the arrows above the page; reorder or delete a page under **Page style**. The title sits on the first page and later pages are numbered.
+- **Page style.** Per page: gutter (tight, normal, wide), panel border (none, thin, normal, bold), white or black paper, and bleed, where panels run to the edge of the paper. **Use this style on every page** copies it to the whole chapter.
+- **Dark mode.** The app follows the system's light or dark theme. Pages themselves always look the same.
 - **Per-panel control.** Tone (light, medium, heavy), line strength (none, soft, bold), and focus or speed lines. Drag inside a panel to reframe the photo and pinch to zoom in, up to 3×. **Move earlier** and **Move later** swap a photo with its neighbour.
 - **Words.** Speech bubbles, thought bubbles, captions and SFX. Drag them anywhere, edit the text, pick one of four sizes, flip a bubble's tail to either side, duplicate one, or shuffle from a built-in word bank that follows the page's mood (action, drama, calm, comedy).
 - **Camera or library.** Take a photo on the spot or choose from your photos, when starting a page and when adding or replacing a panel.
 - **Undo and redo.** Every edit can be stepped back, including removed panels and deleted text.
-- **Chapters.** Every page gets a chapter number and a title, and is kept in a library on the device. Long-press a page to delete it.
-- **Export.** Renders a 1600 × 2262 PNG that you can save to your photos or share.
+- **Chapters.** Every chapter gets a number and a title, and is kept in a library on the device. Long-press a chapter to delete it.
+- **Export.** Renders each page as a 1600 × 2262 PNG. Save all of them to your photos in order, or share the page on screen.
 
 ## Install on Android
 
@@ -85,7 +88,7 @@ tools/
   page-harness/   render a whole page on the desktop
 ```
 
-Pages are stored in the app's document folder as `pages/<id>/`, holding `page.json`, copies of the source photos, and the last exported `page.png`.
+Chapters are stored in the app's document folder as `pages/<id>/`, holding `page.json`, copies of the source photos, and the last exported `page.png` (first page) plus `page-2.png` and so on. Chapters saved before multi-page support are upgraded when they are loaded.
 
 ## Desktop harnesses
 
@@ -104,7 +107,7 @@ Render a full page from already-inked images:
 npx tsx --tsconfig tools/page-harness/tsconfig.json tools/page-harness/render.tsx <out.png> <layout-id> <img1.png> [img2.png ...]
 ```
 
-Layout ids are listed in `src/page/layouts.ts`, for example `3-top` or `4-grid`.
+Layout ids are listed in `src/page/layouts.ts`, for example `3-top` or `6-grid`. Set `FRAME` to a JSON page style (for example `FRAME='{"border":"bold","dark":true}'`) and `SHEET=1` to draw a later page without the title.
 
 ## Stack
 

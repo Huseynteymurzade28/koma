@@ -1,6 +1,7 @@
 // Renders PageDrawing to a PNG on the desktop, using the shader harness output
 // as panel images. Lets us check layout, bubbles and type without a phone.
-//   npx tsx --tsconfig tools/page-harness/tsconfig.json tools/page-harness/render.tsx <out.png> <img1.png> [img2...]
+//   npx tsx --tsconfig tools/page-harness/tsconfig.json tools/page-harness/render.tsx <out.png> <layout-id> <img1.png> [img2...]
+// Optional env: FRAME='{"gutter":"wide","border":"bold","dark":true,"bleed":true}', SHEET=1 to draw it as a later page.
 import { readFileSync, writeFileSync } from 'node:fs';
 import React from 'react';
 
@@ -15,6 +16,7 @@ async function main() {
   const { Skia } = getSkiaExports();
   const { PageDrawing } = require('@/page/PageDrawing');
   const { getLayout, panelRects, layoutsFor } = require('@/page/layouts');
+  const { DEFAULT_FRAME } = require('@/page/types');
   const { DEFAULT_INK } = require('@/manga/tones');
   const { PAGE_W, PAGE_H } = require('@/page/types');
 
@@ -30,9 +32,12 @@ async function main() {
   };
   const images = imgs.map((p) => Skia.Image.MakeImageFromEncoded(Skia.Data.fromBytes(readFileSync(p))));
   const layout = getLayout(layoutId, imgs.length);
-  const r = panelRects(layout);
-  const page = {
-    id: 'x', createdAt: 0, updatedAt: 0, chapter: 7, title: 'The Coffee Incident', mood: 'comedy', layout: layout.id,
+  const frame = { ...DEFAULT_FRAME, ...JSON.parse(process.env.FRAME ?? '{}') };
+  const at = Number(process.env.SHEET ?? 0);
+  const r = panelRects(layout, frame, at === 0);
+  const sheet = {
+    layout: layout.id,
+    frame,
     panels: imgs.map(() => ({ photo: '', ink: DEFAULT_INK, focus: [0.5, 0.5], zoom: 1 })),
     items: [
       { id: '1', kind: 'caption', text: 'It was an ordinary day.', x: r[0].x + 190, y: r[0].y + 46 },
@@ -42,12 +47,17 @@ async function main() {
       { id: '5', kind: 'caption', text: 'The cat had seen everything.', x: r[r.length - 1].x + r[r.length - 1].w / 2, y: r[r.length - 1].y + r[r.length - 1].h - 50 },
     ],
   };
+  // a later sheet needs one before it; the first only carries the title
+  const page = {
+    id: 'x', createdAt: 0, updatedAt: 0, chapter: 7, title: 'The Coffee Incident', mood: 'comedy',
+    sheets: at === 0 ? [sheet, sheet] : [...Array(at).fill(sheet), sheet],
+  };
   const S = 1.2;
   const surface = makeOffscreenSurface(PAGE_W * S, PAGE_H * S);
   const image = await drawOffscreen(
     surface,
     <Group transform={[{ scale: S }]}>
-      <PageDrawing page={page} images={images} fonts={fonts} />
+      <PageDrawing page={page} sheet={at} images={images} fonts={fonts} />
     </Group>,
   );
   writeFileSync(out, image.encodeToBytes());
