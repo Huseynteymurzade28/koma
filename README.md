@@ -16,6 +16,7 @@
 - **Subject cut-out (Android).** Koma finds the person, animal or object in each photo on the device. A panel's background can then be kept, cleared to white or filled black, and focus and speed lines are drawn behind the subject and centred on it.
 - **Page layouts.** 19 layouts for one to six panels. Tap **Layout** to cycle through the ones that fit your photo count.
 - **Multi-page chapters.** A chapter can hold up to 12 pages. Start one with up to 12 photos and Koma spreads them over as few pages as fit, or tap **New page** to add one after the current page. Step between pages with the arrows above the page; reorder or delete a page under **Page style**. The title sits on the first page and later pages are numbered.
+- **Read mode.** Tap **Read** in the editor to read the chapter full screen, one page at a time. Swipe or tap the edges of the screen to turn pages, and tap the middle to show or hide the controls. Pages turn left to right by default; switch to right to left, as printed manga does, and Koma remembers the choice.
 - **Page style.** Per page: gutter (tight, normal, wide), panel border (none, thin, normal, bold), white or black paper, and bleed, where panels run to the edge of the paper. **Use this style on every page** copies it to the whole chapter.
 - **Dark mode.** The app follows the system's light or dark theme. Pages themselves always look the same.
 - **Per-panel control.** Tone (light, medium, heavy), line strength (none, soft, bold), and focus or speed lines. Drag inside a panel to reframe the photo and pinch to zoom in, up to 3×. **Move earlier** and **Move later** swap a photo with its neighbour.
@@ -76,6 +77,7 @@ src/
   app/            Expo Router screens
     index.tsx       library of pages
     page/[id].tsx   page editor
+    read/[id].tsx   full-screen chapter reader
   manga/          photo -> manga pipeline (shaders, tone maths)
   page/           page model, layouts, drawing, storage, photo picking, export
   words/          word bank for titles, bubbles, captions and SFX

@@ -452,6 +452,12 @@ export default function Editor() {
     }
   };
 
+  // the reader loads the chapter from disk, so save the latest edits first
+  const read = async () => {
+    await savePage(page);
+    router.push({ pathname: '/read/[id]', params: { id: page.id, at: String(at) } });
+  };
+
   const commitEdit = () => {
     if (!editing) return;
     const text = editing.text.trim();
@@ -477,6 +483,7 @@ export default function Editor() {
         <Row>
           <Button label="Undo" variant="plain" onPress={undo} disabled={!canUndo} />
           <Button label="Redo" variant="plain" onPress={redo} disabled={!canRedo} />
+          <Button label="Read" variant="plain" onPress={read} disabled={!!busy} />
           <Button label="Export" variant="plain" onPress={exportPage} disabled={!ready || !!busy} />
         </Row>
       </View>
