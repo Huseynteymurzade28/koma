@@ -2,7 +2,8 @@ import { StyleSheet } from 'react-native';
 
 import type { Background, InkParams } from '@/manga/tones';
 import { MARK_LABEL, MARK_ROWS } from '@/page/marks';
-import type { Border, Frame, Gutter, MarkKind, Panel, TextKind } from '@/page/types';
+import { itemSize } from '@/page/textLayout';
+import { isBalloon, type Border, type Frame, type Gutter, type MarkKind, type Panel, type TextItem, type TextKind } from '@/page/types';
 import { space, themed } from '@/theme';
 import { Button, Field, Row, Segmented } from '@/ui/kit';
 import { KIND_LABEL } from '@/words/bank';
@@ -98,16 +99,16 @@ const BACKGROUNDS: { id: Background; label: string }[] = [
   { id: 'black', label: 'Black' },
 ];
 
-export const SIZES = [
+const SIZES = [
   { id: 0.75, label: 'Small' },
   { id: 1, label: 'Normal' },
   { id: 1.3, label: 'Large' },
   { id: 1.7, label: 'Huge' },
 ];
 
-export const TILTS = [-14, -7, 0, 7, 14].map((d) => ({ id: d, label: d === 0 ? '0°' : `${d > 0 ? '+' : ''}${d}°` }));
+const TILTS = [-14, -7, 0, 7, 14].map((d) => ({ id: d, label: d === 0 ? '0°' : `${d > 0 ? '+' : ''}${d}°` }));
 
-export const nearest = (options: { id: number }[], v: number) =>
+const nearest = (options: { id: number }[], v: number) =>
   options.reduce((a, b) => (Math.abs(b.id - v) < Math.abs(a.id - v) ? b : a)).id;
 
 export function PanelTools({
@@ -189,7 +190,7 @@ export function PanelTools({
 }
 
 // every kind of text, three to a row so the labels fit a phone
-export const KIND_ROWS: TextKind[][] = [
+const KIND_ROWS: TextKind[][] = [
   ['bubble', 'shout', 'whisper'],
   ['thought', 'caption', 'sfx'],
 ];
@@ -216,7 +217,100 @@ export function AddMarks({ onAdd }: { onAdd: (m: MarkKind) => void }) {
   ));
 }
 
-export function ItemActions({ onDelete, onDuplicate, onDone }: { onDelete: () => void; onDuplicate: () => void; onDone: () => void }) {
+// ---- item tools -------------------------------------------------------------
+
+type ItemToolsProps = {
+  item: TextItem;
+  onChange: (patch: Partial<TextItem>) => void;
+  onShuffle: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onDuplicate: () => void;
+  onDone: () => void;
+};
+
+export function ItemTools(props: ItemToolsProps) {
+  return props.item.kind === 'mark' ? <MarkTools {...props} /> : <TextTools {...props} />;
+}
+
+function MarkTools({ item, onChange, onDelete, onDuplicate, onDone }: ItemToolsProps) {
+  return (
+    <>
+      <Field label="Mark">
+        {MARK_ROWS.map((row, i) => (
+          <Segmented
+            key={i}
+            options={row.map((m) => ({ id: m, label: MARK_LABEL[m] }))}
+            value={item.mark ?? 'sweat'}
+            onChange={(mark) => onChange({ mark })}
+          />
+        ))}
+      </Field>
+      <Field label="Size">
+        <Segmented options={SIZES} value={nearest(SIZES, itemSize(item))} onChange={(size) => onChange({ size })} />
+      </Field>
+      <Field label="Facing">
+        <Segmented options={SIDES} value={item.flip ? 1 : 0} onChange={(v) => onChange({ flip: v === 1 })} />
+      </Field>
+      <Field label="Tilt">
+        <Segmented options={TILTS} value={item.rotate ?? 0} onChange={(rotate) => onChange({ rotate })} />
+      </Field>
+      <ItemActions onDelete={onDelete} onDuplicate={onDuplicate} onDone={onDone} />
+    </>
+  );
+}
+
+function TextTools({ item, onChange, onShuffle, onEdit, onDelete, onDuplicate, onDone }: ItemToolsProps) {
+  const s = useStyles();
+  const kind = item.kind as TextKind;
+  return (
+    <>
+      <Field label={KIND_LABEL[kind]}>
+        <Row>
+          <Button label="Shuffle" onPress={onShuffle} style={s.flex} />
+          <Button label="Edit" onPress={onEdit} style={s.flex} />
+        </Row>
+      </Field>
+      <Field label="Style">
+        {KIND_ROWS.map((row, i) => (
+          <Segmented
+            key={i}
+            options={row.map((k) => ({ id: k, label: KIND_LABEL[k] }))}
+            value={kind}
+            onChange={(next) => onChange({ kind: next, rotate: next === 'sfx' ? (item.rotate ?? -8) : item.rotate })}
+          />
+        ))}
+      </Field>
+      <Field label="Size">
+        <Segmented options={SIZES} value={nearest(SIZES, itemSize(item))} onChange={(size) => onChange({ size })} />
+      </Field>
+      {isBalloon(kind) && (
+        <Field label="Tail">
+          <Segmented options={SIDES} value={item.flip ? 1 : 0} onChange={(v) => onChange({ flip: v === 1 })} />
+        </Field>
+      )}
+      {kind === 'sfx' && (
+        <Field label="Letters">
+          <Segmented
+            options={[{ id: 0, label: 'Across' }, { id: 1, label: 'Down' }]}
+            value={item.vertical ? 1 : 0}
+            onChange={(v) => onChange({ vertical: v === 1, rotate: v === 1 ? 0 : (item.rotate ?? -8) })}
+          />
+        </Field>
+      )}
+      {kind === 'sfx' && (
+        <Field label="Tilt">
+          <Segmented options={TILTS} value={item.rotate ?? -8} onChange={(rotate) => onChange({ rotate })} />
+        </Field>
+      )}
+      <ItemActions onDelete={onDelete} onDuplicate={onDuplicate} onDone={onDone} />
+    </>
+  );
+}
+
+const SIDES = [{ id: 0, label: 'Left' }, { id: 1, label: 'Right' }];
+
+function ItemActions({ onDelete, onDuplicate, onDone }: { onDelete: () => void; onDuplicate: () => void; onDone: () => void }) {
   const s = useStyles();
   return (
     <Row>

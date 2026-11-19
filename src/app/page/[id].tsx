@@ -25,9 +25,7 @@ import { frameOf, layoutsFor, MAX_PANELS, MAX_SHEETS, sheetRects, TITLE_H, MARGI
 import { PageDrawing } from '@/page/PageDrawing';
 import { pickPhotos } from '@/page/photos';
 import { copyPhoto, loadPage, makeSheet, newPanel, photoFile, prunePhotos, savePage, uid } from '@/page/store';
-import { itemSize } from '@/page/textLayout';
 import {
-  isBalloon,
   type MarkKind,
   PAGE_H,
   PAGE_W,
@@ -41,10 +39,9 @@ import {
 } from '@/page/types';
 import { font, space, themed, usePalette } from '@/theme';
 import { Button, Field, Row, Segmented } from '@/ui/kit';
-import { KIND_LABEL, MOODS, randomLine, randomTitle } from '@/words/bank';
-import { MARK_LABEL, MARK_ROWS } from '@/page/marks';
+import { MOODS, randomLine, randomTitle } from '@/words/bank';
 import { ItemHit, PanelHit, SELECT } from '@/editor/touch';
-import { AddKinds, AddMarks, Done, ItemActions, KIND_ROWS, nearest, PanelTools, SheetTools, SIZES, TILTS } from '@/editor/tools';
+import { AddKinds, AddMarks, Done, ItemTools, PanelTools, SheetTools } from '@/editor/tools';
 
 type Selection =
   | { type: 'panel'; index: number }
@@ -690,89 +687,16 @@ export default function Editor() {
           />
         )}
 
-        {selectedItem?.kind === 'mark' && (
-          <>
-            <Field label="Mark">
-              {MARK_ROWS.map((row, i) => (
-                <Segmented
-                  key={i}
-                  options={row.map((m) => ({ id: m, label: MARK_LABEL[m] }))}
-                  value={selectedItem.mark ?? 'sweat'}
-                  onChange={(mark) => setItem(selectedItem.id, { mark })}
-                />
-              ))}
-            </Field>
-            <Field label="Size">
-              <Segmented options={SIZES} value={nearest(SIZES, itemSize(selectedItem))} onChange={(size) => setItem(selectedItem.id, { size })} />
-            </Field>
-            <Field label="Facing">
-              <Segmented
-                options={[{ id: 0, label: 'Left' }, { id: 1, label: 'Right' }]}
-                value={selectedItem.flip ? 1 : 0}
-                onChange={(v) => setItem(selectedItem.id, { flip: v === 1 })}
-              />
-            </Field>
-            <Field label="Tilt">
-              <Segmented options={TILTS} value={selectedItem.rotate ?? 0} onChange={(rotate) => setItem(selectedItem.id, { rotate })} />
-            </Field>
-            <ItemActions onDelete={() => deleteItem(selectedItem.id)} onDuplicate={() => duplicateItem(selectedItem)} onDone={() => setSel(null)} />
-          </>
-        )}
-
-        {selectedItem && selectedItem.kind !== 'mark' && (
-          <>
-            <Field label={KIND_LABEL[selectedItem.kind]}>
-              <Row>
-                <Button
-                  label="Shuffle"
-                  onPress={() => { setItem(selectedItem.id, { text: randomLine(selectedItem.kind as TextKind, page.mood, selectedItem.text) }); tap(); }}
-                  style={s.flex}
-                />
-                <Button label="Edit" onPress={() => setEditing({ target: selectedItem.id, text: selectedItem.text })} style={s.flex} />
-              </Row>
-            </Field>
-            <Field label="Style">
-              {KIND_ROWS.map((row, i) => (
-                <Segmented
-                  key={i}
-                  options={row.map((k) => ({ id: k, label: KIND_LABEL[k] }))}
-                  value={selectedItem.kind}
-                  onChange={(kind) => setItem(selectedItem.id, { kind, rotate: kind === 'sfx' ? (selectedItem.rotate ?? -8) : selectedItem.rotate })}
-                />
-              ))}
-            </Field>
-            <Field label="Size">
-              <Segmented options={SIZES} value={nearest(SIZES, itemSize(selectedItem))} onChange={(size) => setItem(selectedItem.id, { size })} />
-            </Field>
-            {isBalloon(selectedItem.kind) && (
-              <Field label="Tail">
-                <Segmented
-                  options={[{ id: 0, label: 'Left' }, { id: 1, label: 'Right' }]}
-                  value={selectedItem.flip ? 1 : 0}
-                  onChange={(v) => setItem(selectedItem.id, { flip: v === 1 })}
-                />
-              </Field>
-            )}
-            {selectedItem.kind === 'sfx' && (
-              <Field label="Letters">
-                <Segmented
-                  options={[{ id: 0, label: 'Across' }, { id: 1, label: 'Down' }]}
-                  value={selectedItem.vertical ? 1 : 0}
-                  onChange={(v) => setItem(selectedItem.id, { vertical: v === 1, rotate: v === 1 ? 0 : (selectedItem.rotate ?? -8) })}
-                />
-              </Field>
-            )}
-            {selectedItem.kind === 'sfx' && (
-              <Field label="Tilt">
-                <Segmented
-                  options={TILTS}
-                  value={selectedItem.rotate ?? -8}
-                  onChange={(rotate) => setItem(selectedItem.id, { rotate })}
-                />
-              </Field>
-            )}
-            <ItemActions onDelete={() => deleteItem(selectedItem.id)} onDuplicate={() => duplicateItem(selectedItem)} onDone={() => setSel(null)} />
-          </>
+        {selectedItem && (
+          <ItemTools
+            item={selectedItem}
+            onChange={(patch) => setItem(selectedItem.id, patch)}
+            onShuffle={() => { setItem(selectedItem.id, { text: randomLine(selectedItem.kind as TextKind, page.mood, selectedItem.text) }); tap(); }}
+            onEdit={() => setEditing({ target: selectedItem.id, text: selectedItem.text })}
+            onDelete={() => deleteItem(selectedItem.id)}
+            onDuplicate={() => duplicateItem(selectedItem)}
+            onDone={() => setSel(null)}
+          />
         )}
       </ScrollView>
 
