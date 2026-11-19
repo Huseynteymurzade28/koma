@@ -683,6 +683,8 @@ export default function Editor() {
             onFrame={setFrame}
             onMove={moveSheet}
             onRemove={removeSheet}
+            ending={!!sheet.ending}
+            onEnding={(ending) => { updateSheet((sh) => ({ ...sh, ending })); tap(); }}
             onDone={() => setSel(null)}
           />
         )}

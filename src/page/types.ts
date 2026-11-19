@@ -68,6 +68,9 @@ export type Sheet = {
   panels: Panel[];
   items: TextItem[];
   frame?: Frame; // DEFAULT_FRAME when missing
+  // a "to be continued" banner in the bottom corner; not part of the frame,
+  // so copying a style to every page leaves it where it is
+  ending?: boolean;
 };
 
 // A chapter: what the library lists and what lives in pages/<id>/.

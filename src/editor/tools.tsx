@@ -33,8 +33,12 @@ export function SheetTools({
   onFrame,
   onMove,
   onRemove,
+  ending,
+  onEnding,
   onDone,
 }: {
+  ending: boolean;
+  onEnding: (on: boolean) => void;
   frame: Frame;
   index: number;
   count: number;
@@ -64,6 +68,13 @@ export function SheetTools({
           options={[{ id: 0, label: 'Margin' }, { id: 1, label: 'Bleed' }]}
           value={frame.bleed ? 1 : 0}
           onChange={(v) => onFrame({ bleed: v === 1 })}
+        />
+      </Field>
+      <Field label="Ending">
+        <Segmented
+          options={[{ id: 0, label: 'None' }, { id: 1, label: 'To be continued' }]}
+          value={ending ? 1 : 0}
+          onChange={(v) => onEnding(v === 1)}
         />
       </Field>
       {count > 1 && (

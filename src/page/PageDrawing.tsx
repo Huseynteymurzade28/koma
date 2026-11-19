@@ -51,7 +51,41 @@ export function PageDrawing({ page, sheet: index, images, fonts }: Props) {
       {sheet.items.map((item) => (
         <Item key={item.id} item={item} fonts={fonts} />
       ))}
+      {sheet.ending && <Ending fonts={fonts} bleed={frame.bleed} />}
       {showNumber && <PageNumber n={index + 1} fonts={fonts} color={frame.dark ? PAPER : pageColor.muted} />}
+    </Group>
+  );
+}
+
+const ENDING = 'TO BE CONTINUED';
+
+// a black tag in the bottom right corner, with an arrow on to the next page
+function Ending({ fonts, bleed }: { fonts: PageFonts; bleed: boolean }) {
+  const k = 0.62;
+  const tw = fonts.title.measureText(ENDING).width * k;
+  const h = 58;
+  const arrow = 34;
+  const w = tw + arrow + 54;
+  const inset = bleed ? 28 : MARGIN + 18;
+  const x = PAGE_W - inset - w;
+  const y = PAGE_H - inset - h;
+  const ax = x + w - 20 - arrow;
+  const tip = Skia.Path.Polygon(
+    [
+      { x: ax, y: y + 14 },
+      { x: ax + arrow, y: y + h / 2 },
+      { x: ax, y: y + h - 14 },
+    ],
+    true,
+  );
+  return (
+    <Group>
+      <Rect x={x} y={y} width={w} height={h} color={INK} />
+      <Rect x={x} y={y} width={w} height={h} color="white" style="stroke" strokeWidth={4} />
+      <Group transform={[{ translateX: x + 20 }, { translateY: y + h / 2 + 15 }, { scale: k }]}>
+        <Text x={0} y={0} text={ENDING} font={fonts.title} color="white" />
+      </Group>
+      <Path path={tip} color="white" />
     </Group>
   );
 }

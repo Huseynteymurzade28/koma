@@ -4,6 +4,7 @@
 // Optional env: FRAME='{"gutter":"wide","border":"bold","dark":true,"bleed":true}', SHEET=1 to draw it as a later page,
 // ITEMS='[{"kind":"shout","text":"HEY!!","x":500,"y":400}]' to letter the page with these items instead of the samples.
 // FADE=0,2 to give those panels faded flashback edges.
+// ENDING=1 to put the "to be continued" tag on the page.
 import { readFileSync, writeFileSync } from 'node:fs';
 import React from 'react';
 
@@ -40,6 +41,7 @@ async function main() {
   const sheet = {
     layout: layout.id,
     frame,
+    ending: process.env.ENDING === '1',
     panels: imgs.map((_, i) => ({
       photo: '', ink: DEFAULT_INK, focus: [0.5, 0.5], zoom: 1,
       fade: (process.env.FADE ?? '').split(',').includes(String(i)),
