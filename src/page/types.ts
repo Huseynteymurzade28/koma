@@ -14,6 +14,8 @@ export type MarkKind = 'sweat' | 'anger' | 'sparkle' | 'heart' | 'shock' | 'gloo
 
 export type ItemKind = TextKind | 'mark';
 
+export type CaptionBox = 'white' | 'black' | 'none';
+
 // Anything placed on the page over the panels: lettering or an emotion mark.
 export type TextItem = {
   id: string;
@@ -31,6 +33,8 @@ export type TextItem = {
   flip?: boolean;
   // sfx only: letters stacked top to bottom
   vertical?: boolean;
+  // caption only: white box (default), black box with white type, or no box
+  box?: CaptionBox;
 };
 
 export type Panel = {

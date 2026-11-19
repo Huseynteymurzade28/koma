@@ -108,13 +108,20 @@ function PanelBox({ rect, panel, image, border, color }: PanelProps) {
   );
 }
 
-function Lines({ item, fonts, cx, top }: { item: TextItem; fonts: PageFonts; cx: number; top: number }) {
+type LinesProps = { item: TextItem; fonts: PageFonts; cx: number; top: number; color?: string; halo?: boolean };
+
+// halo: a white outline under the type, for lettering straight on the art
+function Lines({ item, fonts, cx, top, color = INK, halo }: LinesProps) {
   const L = layoutItem(item, fonts);
   const ascent = L.font.getSize() * 0.8;
   return (
     <Group>
+      {halo &&
+        L.lines.map((line, i) => (
+          <Text key={`h${i}`} x={cx - line.width / 2} y={top + ascent + i * L.lineH} text={line.text} font={L.font} color="white" style="stroke" strokeWidth={13} strokeJoin="round" />
+        ))}
       {L.lines.map((line, i) => (
-        <Text key={i} x={cx - line.width / 2} y={top + ascent + i * L.lineH} text={line.text} font={L.font} color={INK} />
+        <Text key={i} x={cx - line.width / 2} y={top + ascent + i * L.lineH} text={line.text} font={L.font} color={color} />
       ))}
     </Group>
   );
@@ -160,11 +167,15 @@ function ItemShape({ item, fonts }: { item: TextItem; fonts: PageFonts }) {
   const textTop = y - (L.lines.length * L.lineH) / 2 - 2;
 
   if (item.kind === 'caption') {
+    const box = item.box ?? 'white';
+    if (box === 'none') return <Lines item={item} fonts={fonts} cx={x} top={textTop} halo />;
+    // a black box reads as a narrator's voice from outside the scene
+    const black = box === 'black';
     return (
       <Group>
-        <Rect x={left} y={top} width={L.w} height={L.h} color="white" />
-        <Rect x={left} y={top} width={L.w} height={L.h} color={INK} style="stroke" strokeWidth={3} />
-        <Lines item={item} fonts={fonts} cx={x} top={textTop} />
+        <Rect x={left} y={top} width={L.w} height={L.h} color={black ? INK : 'white'} />
+        <Rect x={left} y={top} width={L.w} height={L.h} color={black ? 'white' : INK} style="stroke" strokeWidth={3} />
+        <Lines item={item} fonts={fonts} cx={x} top={textTop} color={black ? 'white' : INK} />
       </Group>
     );
   }

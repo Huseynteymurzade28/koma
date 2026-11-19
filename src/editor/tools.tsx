@@ -3,7 +3,7 @@ import { StyleSheet } from 'react-native';
 import type { Background, InkParams } from '@/manga/tones';
 import { MARK_LABEL, MARK_ROWS } from '@/page/marks';
 import { itemSize } from '@/page/textLayout';
-import { isBalloon, type Border, type Frame, type Gutter, type MarkKind, type Panel, type TextItem, type TextKind } from '@/page/types';
+import { isBalloon, type Border, type CaptionBox, type Frame, type Gutter, type MarkKind, type Panel, type TextItem, type TextKind } from '@/page/types';
 import { space, themed } from '@/theme';
 import { Button, Field, Row, Segmented } from '@/ui/kit';
 import { KIND_LABEL } from '@/words/bank';
@@ -298,6 +298,11 @@ function TextTools({ item, onChange, onShuffle, onEdit, onDelete, onDuplicate, o
           <Segmented options={SIDES} value={item.flip ? 1 : 0} onChange={(v) => onChange({ flip: v === 1 })} />
         </Field>
       )}
+      {kind === 'caption' && (
+        <Field label="Box">
+          <Segmented options={CAPTION_BOXES} value={item.box ?? 'white'} onChange={(box) => onChange({ box })} />
+        </Field>
+      )}
       {kind === 'sfx' && (
         <Field label="Letters">
           <Segmented
@@ -353,6 +358,12 @@ function Restack({ onRestack }: { onRestack: (toFront: boolean) => void }) {
     </Field>
   );
 }
+
+const CAPTION_BOXES: { id: CaptionBox; label: string }[] = [
+  { id: 'white', label: 'White' },
+  { id: 'black', label: 'Black' },
+  { id: 'none', label: 'None' },
+];
 
 const SIDES = [{ id: 0, label: 'Left' }, { id: 1, label: 'Right' }];
 
