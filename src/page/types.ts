@@ -1,6 +1,6 @@
 import type { InkParams } from '@/manga/tones';
 
-export type Mood = 'action' | 'drama' | 'calm' | 'comedy';
+export type Mood = 'action' | 'drama' | 'calm' | 'comedy' | 'romance' | 'spooky';
 
 // shout: a jagged burst for yelling; whisper: a dashed outline
 export type TextKind = 'bubble' | 'shout' | 'whisper' | 'thought' | 'caption' | 'sfx';

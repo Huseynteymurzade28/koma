@@ -273,7 +273,7 @@ export default function Editor() {
       : {
           id: uid(),
           kind: kind as TextKind,
-          text: randomLine(kind as TextKind, page.mood),
+          text: randomLine(kind as TextKind, page.mood, new Set(sheet.items.map((i) => i.text))),
           x,
           y,
           rotate: kind === 'sfx' ? -8 : undefined,
@@ -313,16 +313,24 @@ export default function Editor() {
     tap();
   };
 
+  // New words for the whole chapter in the given mood; picking a mood does
+  // this too. Lines already used in the chapter are skipped so none repeats.
   const shuffleAll = (mood: Mood = page.mood) => {
-    update((p) => ({
-      ...p,
-      mood,
-      title: randomTitle(mood, p.title),
-      sheets: p.sheets.map((sh) => ({
-        ...sh,
-        items: sh.items.map((it) => (it.kind === 'mark' ? it : { ...it, text: randomLine(it.kind, mood, it.text) })),
-      })),
-    }));
+    update((p) => {
+      const used = new Set(p.sheets.flatMap((sh) => sh.items.map((it) => it.text)));
+      const fresh = (it: TextItem): TextItem => {
+        if (it.kind === 'mark') return it;
+        const text = randomLine(it.kind, mood, used);
+        used.add(text);
+        return { ...it, text };
+      };
+      return {
+        ...p,
+        mood,
+        title: randomTitle(mood, p.title),
+        sheets: p.sheets.map((sh) => ({ ...sh, items: sh.items.map(fresh) })),
+      };
+    });
     tap();
   };
 
@@ -590,7 +598,9 @@ export default function Editor() {
         {sel === null && (
           <>
             <Field label="Mood">
-              <Segmented options={MOODS} value={page.mood} onChange={(m) => update((p) => ({ ...p, mood: m }))} />
+              {[MOODS.slice(0, 3), MOODS.slice(3)].map((row, i) => (
+                <Segmented key={i} options={row} value={page.mood} onChange={(m) => shuffleAll(m)} />
+              ))}
             </Field>
             <Field label="Add text">
               <AddKinds onAdd={addItem} />
