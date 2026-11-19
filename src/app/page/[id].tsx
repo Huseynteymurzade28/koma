@@ -292,6 +292,20 @@ export default function Editor() {
     setItem(item.id, { x: Math.max(0, Math.min(PAGE_W, item.x + dx)), y: Math.max(0, Math.min(PAGE_H, item.y + dy)) }, true);
   };
 
+  // for starting a page's lettering over; marks go too
+  const clearItems = () =>
+    Alert.alert(page.sheets.length > 1 ? `Clear page ${at + 1}?` : 'Clear the page?', 'All text and marks on it go. You can undo this.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Clear',
+        style: 'destructive',
+        onPress: () => {
+          updateSheet((sh) => ({ ...sh, items: [] }));
+          setSel(null);
+        },
+      },
+    ]);
+
   // items draw in array order, so the last one sits on top
   const restackItem = (itemId: string, toFront: boolean) => {
     updateSheet((sh) => {
@@ -631,6 +645,7 @@ export default function Editor() {
             <Row>
               <Button label="Page style" onPress={() => setSel({ type: 'sheet' })} style={s.flex} />
               <Button label="New page" onPress={addSheet} style={s.flex} disabled={page.sheets.length >= MAX_SHEETS} />
+              <Button label="Clear text" onPress={clearItems} style={s.flex} disabled={sheet.items.length === 0} />
             </Row>
             <Text style={s.hint}>Tap a panel or text to edit. Drag to move, pinch a panel to zoom.</Text>
           </>
