@@ -114,6 +114,8 @@ export default function Editor() {
   const history = useRef({ past: [] as Snapshot[], future: [] as Snapshot[], gesture: false });
   // the last export: which version of the chapter it drew, and the files
   const rendered = useRef<{ page: Page; uris: string[]; strip: string | null } | null>(null);
+  // the item the last nudge moved: nudging another one starts a new undo step
+  const nudged = useRef<string | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
 
@@ -128,6 +130,7 @@ export default function Editor() {
       if (h.past.length > MAX_HISTORY) h.past.shift();
     }
     h.gesture = live;
+    if (!live) nudged.current = null;
     h.future.length = 0;
     pageRef.current = fn(p);
     setPage(pageRef.current);
@@ -137,6 +140,7 @@ export default function Editor() {
 
   const beginGesture = useCallback(() => {
     history.current.gesture = false;
+    nudged.current = null;
   }, []);
 
   const travel = (from: Snapshot[], to: Snapshot[]) => {
@@ -279,6 +283,13 @@ export default function Editor() {
   const deleteItem = (itemId: string) => {
     updateSheet((sh) => ({ ...sh, items: sh.items.filter((i) => i.id !== itemId) }));
     setSel(null);
+  };
+
+  // A run of nudges on one item is one undo step, like a drag.
+  const nudgeItem = (item: TextItem, dx: number, dy: number) => {
+    if (nudged.current !== item.id) beginGesture();
+    nudged.current = item.id;
+    setItem(item.id, { x: Math.max(0, Math.min(PAGE_W, item.x + dx)), y: Math.max(0, Math.min(PAGE_H, item.y + dy)) }, true);
   };
 
   // items draw in array order, so the last one sits on top
@@ -707,6 +718,7 @@ export default function Editor() {
             onDelete={() => deleteItem(selectedItem.id)}
             onDuplicate={() => duplicateItem(selectedItem)}
             onRestack={(toFront) => restackItem(selectedItem.id, toFront)}
+            onNudge={(dx, dy) => nudgeItem(selectedItem, dx, dy)}
             canRestack={sheet.items.length > 1}
             onDone={() => setSel(null)}
           />

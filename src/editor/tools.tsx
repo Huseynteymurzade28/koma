@@ -228,6 +228,7 @@ type ItemToolsProps = {
   onDuplicate: () => void;
   onRestack: (toFront: boolean) => void;
   canRestack: boolean;
+  onNudge: (dx: number, dy: number) => void;
   onDone: () => void;
 };
 
@@ -235,7 +236,7 @@ export function ItemTools(props: ItemToolsProps) {
   return props.item.kind === 'mark' ? <MarkTools {...props} /> : <TextTools {...props} />;
 }
 
-function MarkTools({ item, onChange, onDelete, onDuplicate, onRestack, canRestack, onDone }: ItemToolsProps) {
+function MarkTools({ item, onChange, onDelete, onDuplicate, onRestack, canRestack, onNudge, onDone }: ItemToolsProps) {
   return (
     <>
       <Field label="Mark">
@@ -257,13 +258,14 @@ function MarkTools({ item, onChange, onDelete, onDuplicate, onRestack, canRestac
       <Field label="Tilt">
         <Segmented options={TILTS} value={item.rotate ?? 0} onChange={(rotate) => onChange({ rotate })} />
       </Field>
+      <Nudge onNudge={onNudge} />
       {canRestack && <Restack onRestack={onRestack} />}
       <ItemActions onDelete={onDelete} onDuplicate={onDuplicate} onDone={onDone} />
     </>
   );
 }
 
-function TextTools({ item, onChange, onShuffle, onEdit, onDelete, onDuplicate, onRestack, canRestack, onDone }: ItemToolsProps) {
+function TextTools({ item, onChange, onShuffle, onEdit, onDelete, onDuplicate, onRestack, canRestack, onNudge, onDone }: ItemToolsProps) {
   const s = useStyles();
   const kind = item.kind as TextKind;
   return (
@@ -306,9 +308,32 @@ function TextTools({ item, onChange, onShuffle, onEdit, onDelete, onDuplicate, o
           <Segmented options={TILTS} value={item.rotate ?? -8} onChange={(rotate) => onChange({ rotate })} />
         </Field>
       )}
+      <Nudge onNudge={onNudge} />
       {canRestack && <Restack onRestack={onRestack} />}
       <ItemActions onDelete={onDelete} onDuplicate={onDuplicate} onDone={onDone} />
     </>
+  );
+}
+
+// small steps for placing an item exactly, where a finger covers the spot
+const NUDGE = 4; // page units
+const NUDGES: { label: string; dx: number; dy: number }[] = [
+  { label: '←', dx: -NUDGE, dy: 0 },
+  { label: '↑', dx: 0, dy: -NUDGE },
+  { label: '↓', dx: 0, dy: NUDGE },
+  { label: '→', dx: NUDGE, dy: 0 },
+];
+
+function Nudge({ onNudge }: { onNudge: (dx: number, dy: number) => void }) {
+  const s = useStyles();
+  return (
+    <Field label="Nudge">
+      <Row>
+        {NUDGES.map((n) => (
+          <Button key={n.label} label={n.label} onPress={() => onNudge(n.dx, n.dy)} style={s.flex} />
+        ))}
+      </Row>
+    </Field>
   );
 }
 
