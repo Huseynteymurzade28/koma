@@ -80,9 +80,10 @@ src/
     index.tsx       library of pages
     page/[id].tsx   page editor
     read/[id].tsx   full-screen chapter reader
+  editor/         the editor's tool panels and touch targets
   manga/          photo -> manga pipeline (shaders, tone maths)
-  page/           page model, layouts, drawing, storage, photo picking, export
-  words/          word bank for titles, bubbles, captions and SFX
+  page/           page model, layouts, drawing, emotion marks, storage, photo picking, export
+  words/          word bank for titles, balloons, captions and SFX
   ui/             shared controls
   theme.ts        colours, spacing, fonts
 modules/
@@ -90,9 +91,10 @@ modules/
 tools/
   shader-harness/ run the shaders on the desktop
   page-harness/   render a whole page on the desktop
+  word-check.ts   lint the word bank (npm run words)
 ```
 
-Chapters are stored in the app's document folder as `pages/<id>/`, holding `page.json`, copies of the source photos, and the last exported `page.png` (first page) plus `page-2.png` and so on. Chapters saved before multi-page support are upgraded when they are loaded.
+Chapters are stored in the app's document folder as `pages/<id>/`, holding `page.json`, copies of the source photos, and the last exported `page.png` (first page) plus `page-2.png` and so on, and `strip.png` when the chapter was last exported as one strip. Chapters saved before multi-page support are upgraded when they are loaded.
 
 ## Desktop harnesses
 
@@ -111,7 +113,11 @@ Render a full page from already-inked images:
 npx tsx --tsconfig tools/page-harness/tsconfig.json tools/page-harness/render.tsx <out.png> <layout-id> <img1.png> [img2.png ...]
 ```
 
-Layout ids are listed in `src/page/layouts.ts`, for example `3-top` or `6-grid`. Set `FRAME` to a JSON page style (for example `FRAME='{"border":"bold","dark":true}'`) and `SHEET=1` to draw a later page without the title.
+Layout ids are listed in `src/page/layouts.ts`, for example `3-top` or `6-grid`. Set `FRAME` to a JSON page style (for example `FRAME='{"border":"bold","dark":true}'`) and `SHEET=1` to draw a later page without the title. More variables:
+
+- `ITEMS` letters the page with your own items instead of the samples, as JSON in page units (the page is 1000 × 1414): `ITEMS='[{"kind":"shout","text":"HEY!!","x":500,"y":400},{"kind":"mark","mark":"sweat","text":"","x":700,"y":300}]'`
+- `FADE=0,2` gives those panels faded flashback edges
+- `ENDING=1` adds the To be continued tag
 
 ## Stack
 
