@@ -7,20 +7,27 @@ export type TextKind = 'bubble' | 'shout' | 'whisper' | 'thought' | 'caption' | 
 
 // kinds drawn as a balloon with a tail or trail of dots
 export const BALLOONS: TextKind[] = ['bubble', 'shout', 'whisper', 'thought'];
-export const isBalloon = (kind: TextKind) => BALLOONS.includes(kind);
+export const isBalloon = (kind: ItemKind) => (BALLOONS as ItemKind[]).includes(kind);
 
+// emotion marks: small drawings rather than text, see marks.ts
+export type MarkKind = 'sweat' | 'anger' | 'sparkle' | 'heart' | 'shock' | 'gloom';
+
+export type ItemKind = TextKind | 'mark';
+
+// Anything placed on the page over the panels: lettering or an emotion mark.
 export type TextItem = {
   id: string;
-  kind: TextKind;
-  text: string;
+  kind: ItemKind;
+  text: string; // empty for a mark
+  mark?: MarkKind; // mark only
   // centre of the item in page units (PAGE_W x PAGE_H)
   x: number;
   y: number;
-  // sfx only: degrees
+  // sfx and mark: degrees
   rotate?: number;
   // drawn size relative to the default, 1 when missing
   size?: number;
-  // balloons: tail on the right instead of the left
+  // balloons: tail on the right instead of the left; mark: mirrored
   flip?: boolean;
   // sfx only: letters stacked top to bottom
   vertical?: boolean;

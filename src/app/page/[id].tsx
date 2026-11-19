@@ -29,6 +29,7 @@ import { copyPhoto, loadPage, makeSheet, newPanel, photoFile, prunePhotos, saveP
 import { itemSize, layoutItem } from '@/page/textLayout';
 import {
   isBalloon,
+  type MarkKind,
   PAGE_H,
   PAGE_W,
   type Border,
@@ -44,6 +45,7 @@ import {
 import { font, space, themed, usePalette } from '@/theme';
 import { Button, Field, Row, Segmented } from '@/ui/kit';
 import { KIND_LABEL, MOODS, randomLine, randomTitle } from '@/words/bank';
+import { MARK_LABEL, MARK_ROWS } from '@/page/marks';
 
 type Selection =
   | { type: 'panel'; index: number }
@@ -259,21 +261,28 @@ export default function Editor() {
     tap();
   };
 
-  const addItem = (kind: TextKind) => {
+  const addItem = (kind: TextKind | MarkKind, isMark = false) => {
     const target = sel?.type === 'panel' ? rects[sel.index] : null;
     const x = target ? target.x + target.w / 2 : PAGE_W / 2;
     const y = target ? target.y + Math.min(target.h / 2, 140) : PAGE_H / 2;
-    const item: TextItem = {
-      id: uid(),
-      kind,
-      text: randomLine(kind, page.mood),
-      x,
-      y,
-      rotate: kind === 'sfx' ? -8 : undefined,
-    };
+    const item: TextItem = isMark
+      ? { id: uid(), kind: 'mark', mark: kind as MarkKind, text: '', x, y }
+      : {
+          id: uid(),
+          kind: kind as TextKind,
+          text: randomLine(kind as TextKind, page.mood),
+          x,
+          y,
+          rotate: kind === 'sfx' ? -8 : undefined,
+        };
     updateSheet((sh) => ({ ...sh, items: [...sh.items, item] }));
     setSel({ type: 'item', id: item.id });
     tap();
+  };
+
+  const deleteItem = (itemId: string) => {
+    updateSheet((sh) => ({ ...sh, items: sh.items.filter((i) => i.id !== itemId) }));
+    setSel(null);
   };
 
   const duplicateItem = (src: TextItem) => {
@@ -306,7 +315,10 @@ export default function Editor() {
       ...p,
       mood,
       title: randomTitle(mood, p.title),
-      sheets: p.sheets.map((sh) => ({ ...sh, items: sh.items.map((it) => ({ ...it, text: randomLine(it.kind, mood, it.text) })) })),
+      sheets: p.sheets.map((sh) => ({
+        ...sh,
+        items: sh.items.map((it) => (it.kind === 'mark' ? it : { ...it, text: randomLine(it.kind, mood, it.text) })),
+      })),
     }));
     tap();
   };
@@ -566,6 +578,9 @@ export default function Editor() {
             <Field label="Add text">
               <AddKinds onAdd={addItem} />
             </Field>
+            <Field label="Add mark">
+              <AddMarks onAdd={(m) => addItem(m, true)} />
+            </Field>
             <Row>
               <Button label="Shuffle words" onPress={() => shuffleAll()} style={s.flex} />
               <Button label="Layout" onPress={cycleLayout} style={s.flex} disabled={layoutsFor(sheet.panels.length).length < 2} />
@@ -627,13 +642,42 @@ export default function Editor() {
           />
         )}
 
-        {selectedItem && (
+        {selectedItem?.kind === 'mark' && (
+          <>
+            <Field label="Mark">
+              {MARK_ROWS.map((row, i) => (
+                <Segmented
+                  key={i}
+                  options={row.map((m) => ({ id: m, label: MARK_LABEL[m] }))}
+                  value={selectedItem.mark ?? 'sweat'}
+                  onChange={(mark) => setItem(selectedItem.id, { mark })}
+                />
+              ))}
+            </Field>
+            <Field label="Size">
+              <Segmented options={SIZES} value={nearest(SIZES, itemSize(selectedItem))} onChange={(size) => setItem(selectedItem.id, { size })} />
+            </Field>
+            <Field label="Facing">
+              <Segmented
+                options={[{ id: 0, label: 'Left' }, { id: 1, label: 'Right' }]}
+                value={selectedItem.flip ? 1 : 0}
+                onChange={(v) => setItem(selectedItem.id, { flip: v === 1 })}
+              />
+            </Field>
+            <Field label="Tilt">
+              <Segmented options={TILTS} value={selectedItem.rotate ?? 0} onChange={(rotate) => setItem(selectedItem.id, { rotate })} />
+            </Field>
+            <ItemActions onDelete={() => deleteItem(selectedItem.id)} onDuplicate={() => duplicateItem(selectedItem)} onDone={() => setSel(null)} />
+          </>
+        )}
+
+        {selectedItem && selectedItem.kind !== 'mark' && (
           <>
             <Field label={KIND_LABEL[selectedItem.kind]}>
               <Row>
                 <Button
                   label="Shuffle"
-                  onPress={() => { setItem(selectedItem.id, { text: randomLine(selectedItem.kind, page.mood, selectedItem.text) }); tap(); }}
+                  onPress={() => { setItem(selectedItem.id, { text: randomLine(selectedItem.kind as TextKind, page.mood, selectedItem.text) }); tap(); }}
                   style={s.flex}
                 />
                 <Button label="Edit" onPress={() => setEditing({ target: selectedItem.id, text: selectedItem.text })} style={s.flex} />
@@ -673,22 +717,13 @@ export default function Editor() {
             {selectedItem.kind === 'sfx' && (
               <Field label="Tilt">
                 <Segmented
-                  options={[-14, -7, 0, 7, 14].map((d) => ({ id: d, label: d === 0 ? '0°' : `${d > 0 ? '+' : ''}${d}°` }))}
+                  options={TILTS}
                   value={selectedItem.rotate ?? -8}
                   onChange={(rotate) => setItem(selectedItem.id, { rotate })}
                 />
               </Field>
             )}
-            <Row>
-              <Button
-                label="Delete"
-                danger
-                onPress={() => { updateSheet((sh) => ({ ...sh, items: sh.items.filter((i) => i.id !== selectedItem.id) })); setSel(null); }}
-                style={s.flex}
-              />
-              <Button label="Duplicate" onPress={() => duplicateItem(selectedItem)} style={s.flex} />
-              <Button label="Done" variant="solid" onPress={() => setSel(null)} style={s.flex} />
-            </Row>
+            <ItemActions onDelete={() => deleteItem(selectedItem.id)} onDuplicate={() => duplicateItem(selectedItem)} onDone={() => setSel(null)} />
           </>
         )}
       </ScrollView>
@@ -816,6 +851,8 @@ const SIZES = [
   { id: 1.7, label: 'Huge' },
 ];
 
+const TILTS = [-14, -7, 0, 7, 14].map((d) => ({ id: d, label: d === 0 ? '0°' : `${d > 0 ? '+' : ''}${d}°` }));
+
 const nearest = (options: { id: number }[], v: number) =>
   options.reduce((a, b) => (Math.abs(b.id - v) < Math.abs(a.id - v) ? b : a)).id;
 
@@ -843,7 +880,7 @@ function PanelTools({
   onZoom: (zoom: number) => void;
   onReplace: () => void;
   onRemove: () => void;
-  onAdd: (k: TextKind) => void;
+  onAdd: (k: TextKind | MarkKind, isMark?: boolean) => void;
   onDone: () => void;
 }) {
   const s = useStyles();
@@ -886,6 +923,7 @@ function PanelTools({
       )}
       <Field label="Add to this panel">
         <AddKinds onAdd={onAdd} />
+        <AddMarks onAdd={(m) => onAdd(m, true)} />
       </Field>
       <Row>
         <Button label="Replace photo" onPress={onReplace} style={s.flex} />
@@ -911,6 +949,28 @@ function AddKinds({ onAdd }: { onAdd: (k: TextKind) => void }) {
       ))}
     </Row>
   ));
+}
+
+function AddMarks({ onAdd }: { onAdd: (m: MarkKind) => void }) {
+  const s = useStyles();
+  return MARK_ROWS.map((row, i) => (
+    <Row key={i}>
+      {row.map((m) => (
+        <Button key={m} label={MARK_LABEL[m]} onPress={() => onAdd(m)} style={s.flex} />
+      ))}
+    </Row>
+  ));
+}
+
+function ItemActions({ onDelete, onDuplicate, onDone }: { onDelete: () => void; onDuplicate: () => void; onDone: () => void }) {
+  const s = useStyles();
+  return (
+    <Row>
+      <Button label="Delete" danger onPress={onDelete} style={s.flex} />
+      <Button label="Duplicate" onPress={onDuplicate} style={s.flex} />
+      <Button label="Done" variant="solid" onPress={onDone} style={s.flex} />
+    </Row>
+  );
 }
 
 function Done({ onPress }: { onPress: () => void }) {

@@ -1,7 +1,8 @@
 import type { SkFont } from '@shopify/react-native-skia';
 
 import type { PageFonts } from './fonts';
-import type { TextItem } from './types';
+import { MARK_SIZE } from './marks';
+import type { TextItem, TextKind } from './types';
 
 export type ItemLayout = {
   font: SkFont;
@@ -35,7 +36,7 @@ export function wrap(font: SkFont, text: string, maxW: number) {
 // layoutItem() works at size 1; drawing and hit boxes scale by this around the centre
 export const itemSize = (item: TextItem) => item.size ?? 1;
 
-const MAX_W: Record<TextItem['kind'], number> = { bubble: 250, shout: 240, whisper: 250, thought: 240, caption: 320, sfx: 1000 };
+const MAX_W: Record<TextKind, number> = { bubble: 250, shout: 240, whisper: 250, thought: 240, caption: 320, sfx: 1000 };
 
 // one letter per line, as a sound effect running down the panel; a space
 // leaves an empty half line
@@ -44,6 +45,7 @@ function stack(font: SkFont, text: string) {
 }
 
 export function layoutItem(item: TextItem, fonts: PageFonts): ItemLayout {
+  if (item.kind === 'mark') return { font: fonts.bubble, lines: [], lineH: 0, w: MARK_SIZE, h: MARK_SIZE };
   const font = item.kind === 'sfx' ? fonts.sfx : item.kind === 'caption' ? fonts.caption : fonts.bubble;
   const vertical = item.kind === 'sfx' && !!item.vertical;
   const lines = vertical ? stack(font, item.text || ' ') : wrap(font, item.text || ' ', MAX_W[item.kind]);

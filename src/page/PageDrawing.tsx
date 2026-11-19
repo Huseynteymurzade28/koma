@@ -13,6 +13,7 @@ import {
 
 import { pageColor } from './colors';
 import type { PageFonts } from './fonts';
+import { markPaths } from './marks';
 import { BORDERS, frameOf, MARGIN, sheetRects, type Rect as R, TITLE_Y } from './layouts';
 import { itemSize, layoutItem } from './textLayout';
 import { PAGE_H, PAGE_W, type Page, type Panel, type TextItem } from './types';
@@ -130,7 +131,27 @@ function Item({ item, fonts }: { item: TextItem; fonts: PageFonts }) {
   );
 }
 
+// A mark gets a white halo first so it reads over dark tone, then the white
+// fills and the ink line on top.
+function Mark({ item }: { item: TextItem }) {
+  if (!item.mark) return null;
+  const parts = markPaths(item.mark);
+  const rot = ((item.rotate ?? 0) * Math.PI) / 180;
+  return (
+    <Group transform={[{ translateX: item.x }, { translateY: item.y }, { rotate: rot }, { scaleX: item.flip ? -1 : 1 }]}>
+      {parts.map((p, i) => (
+        <Path key={`h${i}`} path={p.path} color="white" style="stroke" strokeWidth={18} strokeJoin="round" strokeCap="round" />
+      ))}
+      {parts.map((p, i) => p.fill && <Path key={`f${i}`} path={p.path} color="white" />)}
+      {parts.map((p, i) => (
+        <Path key={`s${i}`} path={p.path} color={INK} style="stroke" strokeWidth={7} strokeJoin="round" strokeCap="round" />
+      ))}
+    </Group>
+  );
+}
+
 function ItemShape({ item, fonts }: { item: TextItem; fonts: PageFonts }) {
+  if (item.kind === 'mark') return <Mark item={item} />;
   const L = layoutItem(item, fonts);
   const { x, y } = item;
   const d = item.flip ? -1 : 1; // which side the tail hangs on
