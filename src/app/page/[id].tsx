@@ -281,6 +281,17 @@ export default function Editor() {
     setSel(null);
   };
 
+  // items draw in array order, so the last one sits on top
+  const restackItem = (itemId: string, toFront: boolean) => {
+    updateSheet((sh) => {
+      const item = sh.items.find((i) => i.id === itemId);
+      if (!item) return sh;
+      const rest = sh.items.filter((i) => i.id !== itemId);
+      return { ...sh, items: toFront ? [...rest, item] : [item, ...rest] };
+    });
+    tap();
+  };
+
   const duplicateItem = (src: TextItem) => {
     const item: TextItem = {
       ...src,
@@ -695,6 +706,8 @@ export default function Editor() {
             onEdit={() => setEditing({ target: selectedItem.id, text: selectedItem.text })}
             onDelete={() => deleteItem(selectedItem.id)}
             onDuplicate={() => duplicateItem(selectedItem)}
+            onRestack={(toFront) => restackItem(selectedItem.id, toFront)}
+            canRestack={sheet.items.length > 1}
             onDone={() => setSel(null)}
           />
         )}

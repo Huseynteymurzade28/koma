@@ -226,6 +226,8 @@ type ItemToolsProps = {
   onEdit: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
+  onRestack: (toFront: boolean) => void;
+  canRestack: boolean;
   onDone: () => void;
 };
 
@@ -233,7 +235,7 @@ export function ItemTools(props: ItemToolsProps) {
   return props.item.kind === 'mark' ? <MarkTools {...props} /> : <TextTools {...props} />;
 }
 
-function MarkTools({ item, onChange, onDelete, onDuplicate, onDone }: ItemToolsProps) {
+function MarkTools({ item, onChange, onDelete, onDuplicate, onRestack, canRestack, onDone }: ItemToolsProps) {
   return (
     <>
       <Field label="Mark">
@@ -255,12 +257,13 @@ function MarkTools({ item, onChange, onDelete, onDuplicate, onDone }: ItemToolsP
       <Field label="Tilt">
         <Segmented options={TILTS} value={item.rotate ?? 0} onChange={(rotate) => onChange({ rotate })} />
       </Field>
+      {canRestack && <Restack onRestack={onRestack} />}
       <ItemActions onDelete={onDelete} onDuplicate={onDuplicate} onDone={onDone} />
     </>
   );
 }
 
-function TextTools({ item, onChange, onShuffle, onEdit, onDelete, onDuplicate, onDone }: ItemToolsProps) {
+function TextTools({ item, onChange, onShuffle, onEdit, onDelete, onDuplicate, onRestack, canRestack, onDone }: ItemToolsProps) {
   const s = useStyles();
   const kind = item.kind as TextKind;
   return (
@@ -303,8 +306,22 @@ function TextTools({ item, onChange, onShuffle, onEdit, onDelete, onDuplicate, o
           <Segmented options={TILTS} value={item.rotate ?? -8} onChange={(rotate) => onChange({ rotate })} />
         </Field>
       )}
+      {canRestack && <Restack onRestack={onRestack} />}
       <ItemActions onDelete={onDelete} onDuplicate={onDuplicate} onDone={onDone} />
     </>
+  );
+}
+
+// where the item sits among the others on the page
+function Restack({ onRestack }: { onRestack: (toFront: boolean) => void }) {
+  const s = useStyles();
+  return (
+    <Field label="Layer">
+      <Row>
+        <Button label="Send to back" onPress={() => onRestack(false)} style={s.flex} />
+        <Button label="Bring to front" onPress={() => onRestack(true)} style={s.flex} />
+      </Row>
+    </Field>
   );
 }
 
