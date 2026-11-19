@@ -72,6 +72,28 @@ export function deletePage(id: string) {
   if (dir.exists) dir.delete();
 }
 
+// A copy under a new id with its photos and subject masks. The exports stay
+// behind: they carry the old chapter number, and the editor redraws them.
+export async function duplicatePage(src: Page, chapter: number): Promise<Page> {
+  const id = uid();
+  const from = pageDir(src.id);
+  const to = pageDir(id);
+  to.create();
+  for (const entry of from.list()) {
+    if (entry instanceof File && /^p.+\.jpg(\.mask\.png)?$/.test(entry.name)) await entry.copy(new File(to, entry.name));
+  }
+  const now = Date.now();
+  const page: Page = { ...src, id, chapter, createdAt: now, updatedAt: now };
+  await savePage(page);
+  return page;
+}
+
+export async function renamePage(page: Page, title: string): Promise<Page> {
+  const next = { ...page, title, updatedAt: Date.now() };
+  await savePage(next);
+  return next;
+}
+
 export async function copyPhoto(id: string, uri: string): Promise<string> {
   const dir = pageDir(id);
   if (!dir.exists) dir.create();

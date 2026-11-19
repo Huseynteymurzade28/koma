@@ -5,9 +5,11 @@ import { File, Paths } from 'expo-file-system';
 export type Settings = {
   // reader turns pages right to left, as printed manga does
   readRtl: boolean;
+  // library order: last edited first, or by chapter number
+  librarySort: 'recent' | 'chapter';
 };
 
-const DEFAULTS: Settings = { readRtl: false };
+const DEFAULTS: Settings = { readRtl: false, librarySort: 'recent' };
 
 const file = () => new File(Paths.document, 'settings.json');
 

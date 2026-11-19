@@ -24,7 +24,7 @@
 - **Emotion marks.** Sweat drops, the popping anger vein, sparkles, hearts, shock lines and gloom lines. Drag a mark next to a face, size it, tilt it or mirror it; it gets a white halo so it reads over dark tone.
 - **Camera or library.** Take a photo on the spot or choose from your photos, when starting a page and when adding or replacing a panel.
 - **Undo and redo.** Every edit can be stepped back, including removed panels and deleted text.
-- **Chapters.** Every chapter gets a number and a title, and is kept in a library on the device. Long-press a chapter to delete it.
+- **Chapters.** Every chapter gets a number and a title, and is kept in a library on the device. Sort the library by last edited or by chapter number; Koma remembers which. Long-press a chapter to rename, duplicate or delete it.
 - **Export.** Renders each page as a 1600 × 2262 PNG. Save all of them to your photos in order, or share the page on screen. A chapter of several pages can also go out as one long strip, 800 px wide with the pages one under another, for reading by scrolling the way webtoons do.
 
 ## Install on Android
