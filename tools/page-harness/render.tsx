@@ -3,6 +3,7 @@
 //   npx tsx --tsconfig tools/page-harness/tsconfig.json tools/page-harness/render.tsx <out.png> <layout-id> <img1.png> [img2...]
 // Optional env: FRAME='{"gutter":"wide","border":"bold","dark":true,"bleed":true}', SHEET=1 to draw it as a later page,
 // ITEMS='[{"kind":"shout","text":"HEY!!","x":500,"y":400}]' to letter the page with these items instead of the samples.
+// FADE=0,2 to give those panels faded flashback edges.
 import { readFileSync, writeFileSync } from 'node:fs';
 import React from 'react';
 
@@ -39,7 +40,10 @@ async function main() {
   const sheet = {
     layout: layout.id,
     frame,
-    panels: imgs.map(() => ({ photo: '', ink: DEFAULT_INK, focus: [0.5, 0.5], zoom: 1 })),
+    panels: imgs.map((_, i) => ({
+      photo: '', ink: DEFAULT_INK, focus: [0.5, 0.5], zoom: 1,
+      fade: (process.env.FADE ?? '').split(',').includes(String(i)),
+    })),
     items: process.env.ITEMS ? JSON.parse(process.env.ITEMS).map((it: object, i: number) => ({ id: `i${i}`, ...it })) : [
       { id: '1', kind: 'caption', text: 'It was an ordinary day.', x: r[0].x + 190, y: r[0].y + 46 },
       { id: '2', kind: 'sfx', text: 'KRAK!', x: r[0].x + r[0].w - 150, y: r[0].y + r[0].h - 90, rotate: -8 },

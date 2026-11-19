@@ -43,6 +43,8 @@ export type Panel = {
   // how the photo sits in the panel: 0..1 focus point for crop-to-fill
   focus: [number, number];
   zoom: number; // 1 = cover
+  // flashback look: edges fade into the paper and the border is left off
+  fade?: boolean;
 };
 
 export type Gutter = 'tight' | 'normal' | 'wide';

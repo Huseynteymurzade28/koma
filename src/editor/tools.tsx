@@ -120,6 +120,7 @@ export function PanelTools({
   onMove,
   onInk,
   onZoom,
+  onFade,
   onReplace,
   onRemove,
   onAdd,
@@ -134,6 +135,7 @@ export function PanelTools({
   onMove: (by: -1 | 1) => void;
   onInk: (patch: Partial<InkParams>) => void;
   onZoom: (zoom: number) => void;
+  onFade: (fade: boolean) => void;
   onReplace: () => void;
   onRemove: () => void;
   onAdd: (k: TextKind | MarkKind, isMark?: boolean) => void;
@@ -168,6 +170,13 @@ export function PanelTools({
           <Segmented options={BACKGROUNDS} value={panel.ink.bg ?? 'keep'} onChange={(bg) => onInk({ bg })} />
         </Field>
       )}
+      <Field label="Edges">
+        <Segmented
+          options={[{ id: 0, label: 'Sharp' }, { id: 1, label: 'Faded' }]}
+          value={panel.fade ? 1 : 0}
+          onChange={(v) => onFade(v === 1)}
+        />
+      </Field>
       <Field label="Zoom">
         <Segmented options={ZOOMS} value={zoom} onChange={onZoom} />
       </Field>

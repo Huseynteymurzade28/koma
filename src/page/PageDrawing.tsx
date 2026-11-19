@@ -3,6 +3,7 @@ import {
   DashPathEffect,
   Group,
   Image,
+  LinearGradient,
   Oval,
   Path,
   Rect,
@@ -45,7 +46,7 @@ export function PageDrawing({ page, sheet: index, images, fonts }: Props) {
       <Rect x={0} y={0} width={PAGE_W} height={PAGE_H} color={paper} />
       {index === 0 && <Title page={page} fonts={fonts} color={line} />}
       {rects.map((r, i) => (
-        <PanelBox key={i} rect={r} panel={sheet.panels[i]} image={images[i] ?? null} border={BORDERS[frame.border]} color={line} />
+        <PanelBox key={i} rect={r} panel={sheet.panels[i]} image={images[i] ?? null} border={BORDERS[frame.border]} color={line} paper={paper} />
       ))}
       {sheet.items.map((item) => (
         <Item key={item.id} item={item} fonts={fonts} />
@@ -79,9 +80,9 @@ function Title({ page, fonts, color }: { page: Page; fonts: PageFonts; color: st
   );
 }
 
-type PanelProps = { rect: R; panel: Panel | undefined; image: SkImage | null; border: number; color: string };
+type PanelProps = { rect: R; panel: Panel | undefined; image: SkImage | null; border: number; color: string; paper: string };
 
-function PanelBox({ rect, panel, image, border, color }: PanelProps) {
+function PanelBox({ rect, panel, image, border, color, paper }: PanelProps) {
   const clip = Skia.XYWHRect(rect.x, rect.y, rect.w, rect.h);
   let img = null;
   if (image && panel) {
@@ -100,8 +101,9 @@ function PanelBox({ rect, panel, image, border, color }: PanelProps) {
       <Group clip={clip}>
         <Rect x={rect.x} y={rect.y} width={rect.w} height={rect.h} color="#E9E6DE" />
         {img}
+        {panel?.fade && <Fade rect={rect} paper={paper} />}
       </Group>
-      {border > 0 && (
+      {border > 0 && !panel?.fade && (
         <Rect x={rect.x} y={rect.y} width={rect.w} height={rect.h} color={color} style="stroke" strokeWidth={border} />
       )}
     </Group>
@@ -111,6 +113,24 @@ function PanelBox({ rect, panel, image, border, color }: PanelProps) {
 type LinesProps = { item: TextItem; fonts: PageFonts; cx: number; top: number; color?: string; halo?: boolean };
 
 // halo: a white outline under the type, for lettering straight on the art
+// Four gradients from the paper colour to clear, one per edge, so the photo
+// dissolves into the page like a memory.
+function Fade({ rect: r, paper }: { rect: R; paper: string }) {
+  const d = Math.min(r.w, r.h) * 0.18;
+  const clear = `${paper}00`;
+  const edges = [
+    { x: r.x, y: r.y, w: r.w, h: d, from: [r.x, r.y], to: [r.x, r.y + d] },
+    { x: r.x, y: r.y + r.h - d, w: r.w, h: d, from: [r.x, r.y + r.h], to: [r.x, r.y + r.h - d] },
+    { x: r.x, y: r.y, w: d, h: r.h, from: [r.x, r.y], to: [r.x + d, r.y] },
+    { x: r.x + r.w - d, y: r.y, w: d, h: r.h, from: [r.x + r.w, r.y], to: [r.x + r.w - d, r.y] },
+  ];
+  return edges.map((e, i) => (
+    <Rect key={i} x={e.x} y={e.y} width={e.w} height={e.h}>
+      <LinearGradient start={{ x: e.from[0], y: e.from[1] }} end={{ x: e.to[0], y: e.to[1] }} colors={[paper, clear]} />
+    </Rect>
+  ));
+}
+
 function Lines({ item, fonts, cx, top, color = INK, halo }: LinesProps) {
   const L = layoutItem(item, fonts);
   const ascent = L.font.getSize() * 0.8;

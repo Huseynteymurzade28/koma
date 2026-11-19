@@ -741,6 +741,7 @@ export default function Editor() {
             onMove={(by) => movePanel(sel.index, by)}
             onInk={(patch) => setInk(sel.index, patch)}
             onZoom={(zoom) => setPanel(sel.index, { zoom })}
+            onFade={(fade) => setPanel(sel.index, { fade })}
             onReplace={() => replacePanel(sel.index)}
             onRemove={() => removePanel(sel.index)}
             onAdd={addItem}
