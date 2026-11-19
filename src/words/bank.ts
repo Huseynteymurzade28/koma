@@ -8,8 +8,7 @@ type Pool = Record<TextKind, string[]>;
 
 const shared: Pool = {
   sfx: [
-    'BAM!', 'THUD', 'WHAM!', 'SNAP', 'CLICK', 'TAP TAP', 'KRAK!', 'WHOOSH', 'SWISH', 'FWIP', 'DOKI DOKI',
-    'BA-DUMP', 'GULP', 'SIGH...', 'HUFF', 'GASP!', 'SHFF', 'DING!', 'BZZT', 'CREAK', 'DRIP', 'SPLASH!',
+    'BAM!', 'THUD', 'WHAM!', 'SNAP', 'CLICK', 'TAP TAP', 'KRAK!', 'WHOOSH', 'SWISH', 'FWIP', 'GULP', 'SIGH...', 'HUFF', 'GASP!', 'SHFF', 'DING!', 'BZZT', 'CREAK', 'DRIP', 'SPLASH!',
     'RUSTLE', 'STOMP', 'ZING!', 'POP!', 'RUMBLE', 'THUMP', 'FWOOSH', 'TICK TOCK', 'KNOCK KNOCK', 'BEEP BEEP',
     'CLATTER', 'SQUISH', 'THWIP', 'WHIRR', 'CLACK', 'SHAKE SHAKE', 'PING!', 'GRRR',
   ],
@@ -144,9 +143,9 @@ const moods: Record<Mood, Pool> = {
   },
   calm: {
     sfx: [
-      'SIP', 'CLINK', 'PURR', 'TWEET', 'RUSTLE', 'FLUTTER', 'HUM', 'SHHH', 'PAT PAT', 'NOM NOM', 'MUNCH',
-      'SLURP', 'FWAH', 'YAWN', 'TIP TAP', 'PLIP', 'CHIRP', 'WHIRR', 'KOTO', 'POKA POKA', 'SIZZLE', 'BLOOP',
-      'SNIP', 'SCRITCH', 'DRIP', 'SWAY', 'PITTER PAT', 'FWUMP', 'CRUNCH', 'MEW',
+      'SIP', 'CLINK', 'PURR', 'TWEET', 'FLUTTER', 'HUM', 'SHHH', 'PAT PAT', 'NOM NOM', 'MUNCH',
+      'SLURP', 'FWAH', 'YAWN', 'TIP TAP', 'PLIP', 'CHIRP', 'KOTO', 'POKA POKA', 'SIZZLE', 'BLOOP',
+      'SNIP', 'SCRITCH', 'SWAY', 'PITTER PAT', 'FWUMP', 'CRUNCH', 'MEW',
     ],
     bubble: [
       'Nice weather today.', 'Let\'s take the long way home.', 'This is the good stuff.', 'Mmm. Perfect.',
@@ -228,7 +227,7 @@ const moods: Record<Mood, Pool> = {
   romance: {
     sfx: [
       'DOKI DOKI', 'BA-DUMP', 'THUMP THUMP', 'FLUTTER', 'KYUN', 'BLUSH', 'FWAH', 'SPARKLE', 'SHIMMER',
-      'GLOW', 'TWINKLE', 'PITTER PATTER', 'HUSH', 'SIGH...', 'TOUCH', 'GIGGLE', 'SWOON', 'PAT', 'FLOAT',
+      'GLOW', 'TWINKLE', 'PITTER PATTER', 'HUSH', 'TOUCH', 'GIGGLE', 'SWOON', 'PAT', 'FLOAT',
       'CHIME',
     ],
     bubble: [
@@ -265,12 +264,11 @@ const moods: Record<Mood, Pool> = {
   },
   spooky: {
     sfx: [
-      'CREEEAK', 'DRIP... DRIP', 'SCRITCH', 'THUMP...', 'WHOOOO', 'KNOCK... KNOCK...', 'SKREEE', 'FLICKER',
-      'HISS', 'TAP... TAP...', 'RATTLE', 'CRACK', 'SHHHH', 'GURGLE', 'SLAM!', 'TICK... TICK...', 'RUSTLE',
-      'THUD', 'SCRAAAPE', 'ZZZT',
+      'CREEEAK', 'DRIP... DRIP', 'SCRITCH', 'THUMP...', 'WHOOOO', 'KNOCK... KNOCK', 'SKREEE', 'FLICKER',
+      'HISS', 'TAP... TAP...', 'RATTLE', 'CRACK', 'SHHHH', 'GURGLE', 'SLAM!', 'TICK... TICK...', 'SCRAAAPE', 'ZZZT',
     ],
     bubble: [
-      'Did you hear that?', 'That door was closed a minute ago.', 'Who\'s there?', 'Don\'t go in there.',
+      'That door was closed a minute ago.', 'Who\'s there?', 'Don\'t go in there.',
       'We shouldn\'t be here.', 'It\'s just the wind... right?', 'The lights were on when we left.',
       'Why is it so cold all of a sudden?', 'Something\'s watching us.', 'Let\'s go back. Now.',
       'That wasn\'t there before.', 'You saw it too, didn\'t you?', 'Stay close.',
