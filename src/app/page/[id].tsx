@@ -292,6 +292,30 @@ export default function Editor() {
     setItem(item.id, { x: Math.max(0, Math.min(PAGE_W, item.x + dx)), y: Math.max(0, Math.min(PAGE_H, item.y + dy)) }, true);
   };
 
+  // text whose centre lies inside panel i; marks are left out
+  const inPanel = (i: number) => {
+    const r = rects[i];
+    if (!r) return [];
+    return sheet.items.filter((it) => it.kind !== 'mark' && it.x >= r.x && it.x <= r.x + r.w && it.y >= r.y && it.y <= r.y + r.h);
+  };
+
+  const shufflePanel = (i: number) => {
+    const ids = new Set(inPanel(i).map((it) => it.id));
+    updateSheet((sh) => {
+      const used = new Set(sh.items.map((it) => it.text));
+      return {
+        ...sh,
+        items: sh.items.map((it) => {
+          if (!ids.has(it.id)) return it;
+          const text = randomLine(it.kind as TextKind, page.mood, used);
+          used.add(text);
+          return { ...it, text };
+        }),
+      };
+    });
+    tap();
+  };
+
   // for starting a page's lettering over; marks go too
   const clearItems = () =>
     Alert.alert(page.sheets.length > 1 ? `Clear page ${at + 1}?` : 'Clear the page?', 'All text and marks on it go. You can undo this.', [
@@ -720,6 +744,7 @@ export default function Editor() {
             onReplace={() => replacePanel(sel.index)}
             onRemove={() => removePanel(sel.index)}
             onAdd={addItem}
+            onShuffle={inPanel(sel.index).length > 0 ? () => shufflePanel(sel.index) : undefined}
             onDone={() => setSel(null)}
           />
         )}

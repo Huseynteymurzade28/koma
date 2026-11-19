@@ -123,6 +123,7 @@ export function PanelTools({
   onReplace,
   onRemove,
   onAdd,
+  onShuffle,
   onDone,
 }: {
   panel: Panel;
@@ -136,6 +137,8 @@ export function PanelTools({
   onReplace: () => void;
   onRemove: () => void;
   onAdd: (k: TextKind | MarkKind, isMark?: boolean) => void;
+  // missing when the panel has no text to shuffle
+  onShuffle?: () => void;
   onDone: () => void;
 }) {
   const s = useStyles();
@@ -180,6 +183,7 @@ export function PanelTools({
         <AddKinds onAdd={onAdd} />
         <AddMarks onAdd={(m) => onAdd(m, true)} />
       </Field>
+      {onShuffle && <Button label="Shuffle words in this panel" onPress={onShuffle} />}
       <Row>
         <Button label="Replace photo" onPress={onReplace} style={s.flex} />
         {canRemove && <Button label="Remove" danger onPress={onRemove} style={s.flex} />}
