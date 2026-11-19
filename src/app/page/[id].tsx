@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { prepare, renderInk, type Prepared } from '@/manga/process';
 import { type Background, type InkParams } from '@/manga/tones';
-import { renderPagePng, saveToPhotos, sharePng } from '@/page/export';
+import { renderPagePng, renderStripPng, saveToPhotos, sharePng } from '@/page/export';
 import { pageColor } from '@/page/colors';
 import { usePageFonts, type PageFonts } from '@/page/fonts';
 import { frameOf, layoutsFor, MAX_PANELS, MAX_SHEETS, sheetRects, TITLE_H, MARGIN, type Rect } from '@/page/layouts';
@@ -52,6 +52,7 @@ type Selection =
   | { type: 'item'; id: string }
   | { type: 'title' }
   | { type: 'sheet' } // the current page itself: its frame, order, removal
+  | { type: 'export' }
   | null;
 
 // an undo step remembers which page it happened on, so undo can show it
@@ -118,6 +119,8 @@ export default function Editor() {
   // ---- edits + undo history ------------------------------------------------
 
   const history = useRef({ past: [] as Snapshot[], future: [] as Snapshot[], gesture: false });
+  // the last export: which version of the chapter it drew, and the files
+  const rendered = useRef<{ page: Page; uris: string[]; strip: string | null } | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
 
@@ -430,8 +433,11 @@ export default function Editor() {
     return out;
   };
 
-  const exportPage = async () => {
-    if (!images.every(Boolean)) return;
+  // Renders every sheet once per version of the chapter: the export tools
+  // can then save, share and build the strip without drawing it all again.
+  const renderAll = async () => {
+    const done = rendered.current;
+    if (done && done.page === page) return done;
     const n = page.sheets.length;
     setBusy('Rendering…');
     try {
@@ -443,25 +449,36 @@ export default function Editor() {
         uris.push(await renderPagePng(page, i, imgs, fonts));
       }
       prunePhotos(page);
+      rendered.current = { page, uris, strip: null };
+      return rendered.current;
+    } finally {
       setBusy(null);
-      const here = uris[at];
-      Alert.alert(n > 1 ? `${n} pages ready` : 'Page ready', `Chapter ${page.chapter} · ${page.title}`, [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: n > 1 ? 'Share this page' : 'Share',
-          onPress: () => sharePng(here).catch((e) => Alert.alert('Could not share', String(e?.message ?? e))),
-        },
-        {
-          text: n > 1 ? `Save all ${n}` : 'Save to Photos',
-          onPress: () =>
-            saveToPhotos(uris)
-              .then(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}))
-              .catch((e) => Alert.alert('Could not save', String(e?.message ?? e))),
-        },
-      ]);
+    }
+  };
+
+  const renderStrip = async () => {
+    const done = await renderAll();
+    if (!done.strip) {
+      setBusy('Joining pages…');
+      try {
+        done.strip = await renderStripPng(page, done.uris);
+      } finally {
+        setBusy(null);
+      }
+    }
+    return done.strip;
+  };
+
+  const runExport = async (what: 'save' | 'share' | 'saveStrip' | 'shareStrip') => {
+    if (!ready || busy) return;
+    try {
+      if (what === 'save') await saveToPhotos((await renderAll()).uris);
+      else if (what === 'share') await sharePng((await renderAll()).uris[at]);
+      else if (what === 'saveStrip') await saveToPhotos([await renderStrip()]);
+      else await sharePng(await renderStrip(), 'Share chapter');
+      if (what.startsWith('save')) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (e) {
-      setBusy(null);
-      Alert.alert('Could not render the page', String((e as Error)?.message ?? e));
+      Alert.alert('Could not export', String((e as Error)?.message ?? e));
     }
   };
 
@@ -497,7 +514,7 @@ export default function Editor() {
           <Button label="Undo" variant="plain" onPress={undo} disabled={!canUndo} />
           <Button label="Redo" variant="plain" onPress={redo} disabled={!canRedo} />
           <Button label="Read" variant="plain" onPress={read} disabled={!!busy} />
-          <Button label="Export" variant="plain" onPress={exportPage} disabled={!ready || !!busy} />
+          <Button label="Export" variant="plain" onPress={() => setSel({ type: 'export' })} disabled={!ready || !!busy} />
         </Row>
       </View>
 
@@ -604,6 +621,31 @@ export default function Editor() {
             onRemove={removeSheet}
             onDone={() => setSel(null)}
           />
+        )}
+
+        {sel?.type === 'export' && (
+          <>
+            <Text style={s.hint}>
+              Chapter {page.chapter} · {page.title}
+              {many ? ` · ${page.sheets.length} pages` : ''}
+            </Text>
+            <Field label={many ? 'Pages' : 'Page'}>
+              <Row>
+                <Button label={many ? `Save all ${page.sheets.length}` : 'Save to Photos'} onPress={() => runExport('save')} disabled={!!busy} style={s.flex} />
+                <Button label={many ? 'Share this page' : 'Share'} onPress={() => runExport('share')} disabled={!!busy} style={s.flex} />
+              </Row>
+            </Field>
+            {many && (
+              <Field label="One long strip">
+                <Row>
+                  <Button label="Save strip" onPress={() => runExport('saveStrip')} disabled={!!busy} style={s.flex} />
+                  <Button label="Share strip" onPress={() => runExport('shareStrip')} disabled={!!busy} style={s.flex} />
+                </Row>
+              </Field>
+            )}
+            {many && <Text style={s.hint}>The strip puts every page under the last, for reading by scrolling.</Text>}
+            <Done onPress={() => setSel(null)} />
+          </>
         )}
 
         {sel?.type === 'title' && (

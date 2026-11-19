@@ -11,6 +11,7 @@ import { DEFAULT_FRAME, type Frame, type Mood, type Page, type Panel, type Sheet
 //   pages/<id>/p0.jpg.mask.png  subject mask of a photo, made on first use
 //   pages/<id>/page.png    last export of the first sheet, also the library thumbnail
 //   pages/<id>/page-2.png  ... and of the sheets after it
+//   pages/<id>/strip.png   last export of the whole chapter as one tall strip
 
 const root = () => {
   const d = new Directory(Paths.document, 'pages');

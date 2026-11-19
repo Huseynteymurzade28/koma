@@ -25,7 +25,7 @@
 - **Camera or library.** Take a photo on the spot or choose from your photos, when starting a page and when adding or replacing a panel.
 - **Undo and redo.** Every edit can be stepped back, including removed panels and deleted text.
 - **Chapters.** Every chapter gets a number and a title, and is kept in a library on the device. Long-press a chapter to delete it.
-- **Export.** Renders each page as a 1600 × 2262 PNG. Save all of them to your photos in order, or share the page on screen.
+- **Export.** Renders each page as a 1600 × 2262 PNG. Save all of them to your photos in order, or share the page on screen. A chapter of several pages can also go out as one long strip, 800 px wide with the pages one under another, for reading by scrolling the way webtoons do.
 
 ## Install on Android
 
