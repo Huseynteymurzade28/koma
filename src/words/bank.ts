@@ -18,6 +18,8 @@ const shared: Pool = {
     'That\'s... actually amazing.', 'Five more minutes.', 'Just one more.', 'Trust me.',
     'We don\'t talk about this.', 'Nobody saw that.', 'Act natural.', 'I can explain.', 'Who did this?!',
   ],
+  shout: ['WHAT?!', 'NO WAY!!', 'HEY!!', 'STOP!!', 'WAIT!!', 'SERIOUSLY?!', 'NOT AGAIN!!', 'LOOK OUT!!'],
+  whisper: ['psst...', 'did you hear that?', 'don\'t tell anyone...', 'over here...', 'shh... they\'ll hear us', 'just between us...'],
   thought: [
     'Stay calm...', 'Don\'t panic.', 'Why am I like this?', 'Is it just me?', 'Focus...',
     'This is fine.', 'They can\'t know.', 'Not today.', 'Remember this moment.', 'Breathe.',
@@ -46,6 +48,8 @@ const moods: Record<Mood, Pool> = {
       'This is my true power!', 'One more round.', 'Don\'t you dare give up!', 'I\'m just getting started.',
       'Move!', 'Follow my lead.', 'That was a warm-up.', 'Nobody touches my coffee.',
     ],
+    shout: ['RUUUN!!', 'NOW!!', 'GET DOWN!!', 'TAKE THIS!!', 'I WON\'T LOSE!!', 'BEHIND YOU!!', 'FULL POWER!!', 'CHAAARGE!!'],
+    whisper: ['on my signal...', 'stay low.', 'they\'re close...', 'three... two...', 'not a sound.'],
     thought: [
       'Faster... I need to be faster!', 'There\'s an opening!', 'My body moved on its own.',
       'One shot. That\'s all I get.', 'Don\'t blink.', 'This power...!', 'Not like this...',
@@ -70,6 +74,8 @@ const moods: Record<Mood, Pool> = {
       'We were happy once.', 'You changed.', 'I don\'t regret it.', 'Say something.', 'It\'s not over.',
       'Just this once... stay.', 'I wanted to tell you.', 'Some things can\'t be fixed.',
     ],
+    shout: ['WHY?!', 'DON\'T GO!!', 'YOU LIED TO ME!!', 'COME BACK!!', 'IT WASN\'T MY FAULT!!', 'ANSWER ME!!'],
+    whisper: ['i\'m sorry...', 'please... stay.', 'i never stopped waiting.', 'it\'s okay now.', 'thank you...'],
     thought: [
       'If only I had said it then.', 'Why does it hurt so much?', 'I can\'t cry here.',
       'This feeling... what is it?', 'Maybe it was always meant to be.', 'I\'m not ready.',
@@ -94,6 +100,8 @@ const moods: Record<Mood, Pool> = {
       'I like days like this.', 'Look at the sky.', 'Tea or coffee?', 'Slow mornings are the best.',
       'Let\'s not rush.', 'Hey, look at this.', 'We should come here more.', 'You look happy.',
     ],
+    shout: ['DINNER\'S READY!', 'OVER HERE!', 'LOOK, A RAINBOW!', 'GOOD MORNING!', 'WAIT FOR ME!'],
+    whisper: ['it\'s sleeping...', 'listen... the rain.', 'let\'s stay a bit longer.', 'so warm...', 'goodnight.'],
     thought: [
       'Small things matter.', 'This is enough.', 'I want to remember today.', 'Peaceful...',
       'Time moves slower here.', 'Warm.', 'What a nice day.', 'I\'m glad I came.', 'Happiness tastes like this.',
@@ -120,6 +128,8 @@ const moods: Record<Mood, Pool> = {
       'Five-second rule!', 'Respect the snack.', 'I\'m not lost. I\'m exploring.', 'Zero regrets. Some regrets.',
       'Cat did it.', 'Was that... my phone?',
     ],
+    shout: ['MY SNACK!!', 'WHO ATE IT?!', 'THAT\'S NOT A CAT!!', 'I\'M FINE!!', 'NOT THE FACE!!', 'IT\'S STUCK!!'],
+    whisper: ['act natural...', 'i think it saw us.', 'nobody panic.', 'is it still looking?', 'blame the cat.'],
     thought: [
       'Abort. ABORT.', 'Why did I say that?!', 'Smooth. Very smooth.', 'Nailed it. Probably.',
       'Don\'t laugh. Don\'t laugh.', 'Is it too late to pretend I\'m asleep?', 'Oh no.',
@@ -189,6 +199,8 @@ export const MOODS: { id: Mood; label: string }[] = [
 
 export const KIND_LABEL: Record<TextKind, string> = {
   bubble: 'Speech',
+  shout: 'Shout',
+  whisper: 'Whisper',
   thought: 'Thought',
   caption: 'Caption',
   sfx: 'Sound',

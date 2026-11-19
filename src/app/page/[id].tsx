@@ -28,6 +28,7 @@ import { pickPhotos } from '@/page/photos';
 import { copyPhoto, loadPage, makeSheet, newPanel, photoFile, prunePhotos, savePage, uid } from '@/page/store';
 import { itemSize, layoutItem } from '@/page/textLayout';
 import {
+  isBalloon,
   PAGE_H,
   PAGE_W,
   type Border,
@@ -563,11 +564,7 @@ export default function Editor() {
               <Segmented options={MOODS} value={page.mood} onChange={(m) => update((p) => ({ ...p, mood: m }))} />
             </Field>
             <Field label="Add text">
-              <Row>
-                {(['bubble', 'thought', 'caption', 'sfx'] as TextKind[]).map((k) => (
-                  <Button key={k} label={KIND_LABEL[k]} onPress={() => addItem(k)} style={s.flex} />
-                ))}
-              </Row>
+              <AddKinds onAdd={addItem} />
             </Field>
             <Row>
               <Button label="Shuffle words" onPress={() => shuffleAll()} style={s.flex} />
@@ -643,21 +640,33 @@ export default function Editor() {
               </Row>
             </Field>
             <Field label="Style">
-              <Segmented
-                options={(['bubble', 'thought', 'caption', 'sfx'] as TextKind[]).map((k) => ({ id: k, label: KIND_LABEL[k] }))}
-                value={selectedItem.kind}
-                onChange={(kind) => setItem(selectedItem.id, { kind, rotate: kind === 'sfx' ? (selectedItem.rotate ?? -8) : selectedItem.rotate })}
-              />
+              {KIND_ROWS.map((row, i) => (
+                <Segmented
+                  key={i}
+                  options={row.map((k) => ({ id: k, label: KIND_LABEL[k] }))}
+                  value={selectedItem.kind}
+                  onChange={(kind) => setItem(selectedItem.id, { kind, rotate: kind === 'sfx' ? (selectedItem.rotate ?? -8) : selectedItem.rotate })}
+                />
+              ))}
             </Field>
             <Field label="Size">
               <Segmented options={SIZES} value={nearest(SIZES, itemSize(selectedItem))} onChange={(size) => setItem(selectedItem.id, { size })} />
             </Field>
-            {(selectedItem.kind === 'bubble' || selectedItem.kind === 'thought') && (
+            {isBalloon(selectedItem.kind) && (
               <Field label="Tail">
                 <Segmented
                   options={[{ id: 0, label: 'Left' }, { id: 1, label: 'Right' }]}
                   value={selectedItem.flip ? 1 : 0}
                   onChange={(v) => setItem(selectedItem.id, { flip: v === 1 })}
+                />
+              </Field>
+            )}
+            {selectedItem.kind === 'sfx' && (
+              <Field label="Letters">
+                <Segmented
+                  options={[{ id: 0, label: 'Across' }, { id: 1, label: 'Down' }]}
+                  value={selectedItem.vertical ? 1 : 0}
+                  onChange={(v) => setItem(selectedItem.id, { vertical: v === 1, rotate: v === 1 ? 0 : (selectedItem.rotate ?? -8) })}
                 />
               </Field>
             )}
@@ -876,11 +885,7 @@ function PanelTools({
         </Field>
       )}
       <Field label="Add to this panel">
-        <Row>
-          {(['bubble', 'thought', 'caption', 'sfx'] as TextKind[]).map((k) => (
-            <Button key={k} label={KIND_LABEL[k]} onPress={() => onAdd(k)} style={s.flex} />
-          ))}
-        </Row>
+        <AddKinds onAdd={onAdd} />
       </Field>
       <Row>
         <Button label="Replace photo" onPress={onReplace} style={s.flex} />
@@ -889,6 +894,23 @@ function PanelTools({
       </Row>
     </>
   );
+}
+
+// every kind of text, three to a row so the labels fit a phone
+const KIND_ROWS: TextKind[][] = [
+  ['bubble', 'shout', 'whisper'],
+  ['thought', 'caption', 'sfx'],
+];
+
+function AddKinds({ onAdd }: { onAdd: (k: TextKind) => void }) {
+  const s = useStyles();
+  return KIND_ROWS.map((row, i) => (
+    <Row key={i}>
+      {row.map((k) => (
+        <Button key={k} label={KIND_LABEL[k]} onPress={() => onAdd(k)} style={s.flex} />
+      ))}
+    </Row>
+  ));
 }
 
 function Done({ onPress }: { onPress: () => void }) {

@@ -1,5 +1,6 @@
 import {
   Circle,
+  DashPathEffect,
   Group,
   Image,
   Oval,
@@ -165,8 +166,34 @@ function ItemShape({ item, fonts }: { item: TextItem; fonts: PageFonts }) {
     );
   }
 
-  // speech / thought bubble: outline first, fills on top, so tail and
-  // ellipse merge into one shape with a single outline
+  // balloons: outline first, fills on top, so tail and body merge into one
+  // shape with a single outline
+  if (item.kind === 'shout') {
+    const body = burst(item, x, y, L.w, L.h);
+    const bx = x - d * L.w * 0.16;
+    const by = y + L.h * 0.36;
+    // a lightning-bolt tail, kinked once on the way down
+    const tail = Skia.Path.Polygon(
+      [
+        { x: bx - d * 20, y: by },
+        { x: bx + d * 18, y: by + 4 },
+        { x: bx - d * 4, y: by + 36 },
+        { x: bx - d * 44, y: by + 78 },
+        { x: bx - d * 20, y: by + 30 },
+      ],
+      true,
+    );
+    return (
+      <Group>
+        <Path path={body} color={INK} style="stroke" strokeWidth={6} strokeJoin="miter" />
+        <Path path={tail} color={INK} style="stroke" strokeWidth={6} strokeJoin="miter" />
+        <Path path={body} color="white" />
+        <Path path={tail} color="white" />
+        <Lines item={item} fonts={fonts} cx={x} top={textTop} />
+      </Group>
+    );
+  }
+
   const oval = Skia.XYWHRect(left, top, L.w, L.h);
   if (item.kind === 'thought') {
     const dots = [
@@ -193,13 +220,46 @@ function ItemShape({ item, fonts }: { item: TextItem; fonts: PageFonts }) {
     ],
     true,
   );
+  // a whisper is drawn with a thinner, broken line
+  const whisper = item.kind === 'whisper';
+  const stroke = whisper ? 4 : 6;
   return (
     <Group>
-      <Oval rect={oval} color={INK} style="stroke" strokeWidth={6} />
-      <Path path={tail} color={INK} style="stroke" strokeWidth={6} strokeJoin="round" />
+      <Oval rect={oval} color={INK} style="stroke" strokeWidth={stroke}>
+        {whisper && <DashPathEffect intervals={[16, 10]} />}
+      </Oval>
+      <Path path={tail} color={INK} style="stroke" strokeWidth={stroke} strokeJoin="round">
+        {whisper && <DashPathEffect intervals={[12, 8]} />}
+      </Path>
       <Oval rect={oval} color="white" />
       <Path path={tail} color="white" />
       <Lines item={item} fonts={fonts} cx={x} top={textTop} />
     </Group>
   );
+}
+
+// Spikes around an ellipse. Their spacing and length wobble a little, seeded
+// by the item's id, so every shout looks hand drawn but stays put on redraw.
+function burst(item: TextItem, cx: number, cy: number, w: number, h: number) {
+  const rnd = seeded(item.id);
+  const rx = w / 2;
+  const ry = h / 2;
+  const n = Math.max(12, Math.round((Math.PI * (rx + ry)) / 44));
+  const points = [];
+  for (let i = 0; i < n * 2; i++) {
+    const a = ((i + (rnd() - 0.5) * 0.5) / (n * 2)) * Math.PI * 2;
+    const k = i % 2 === 0 ? 1 + rnd() * 0.08 : 0.8 + rnd() * 0.04;
+    points.push({ x: cx + Math.cos(a) * rx * k, y: cy + Math.sin(a) * ry * k });
+  }
+  return Skia.Path.Polygon(points, true);
+}
+
+function seeded(key: string) {
+  let h = 2166136261;
+  for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619);
+  return () => {
+    h = Math.imul(h ^ (h >>> 15), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return ((h ^= h >>> 16) >>> 0) / 4294967296;
+  };
 }

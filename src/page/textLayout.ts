@@ -35,16 +35,30 @@ export function wrap(font: SkFont, text: string, maxW: number) {
 // layoutItem() works at size 1; drawing and hit boxes scale by this around the centre
 export const itemSize = (item: TextItem) => item.size ?? 1;
 
-const MAX_W = { bubble: 250, thought: 240, caption: 320, sfx: 1000 } as const;
+const MAX_W: Record<TextItem['kind'], number> = { bubble: 250, shout: 240, whisper: 250, thought: 240, caption: 320, sfx: 1000 };
+
+// one letter per line, as a sound effect running down the panel; a space
+// leaves an empty half line
+function stack(font: SkFont, text: string) {
+  return [...text.replace(/\s+/g, ' ').trim()].map((ch) => ({ text: ch === ' ' ? '' : ch, width: ch === ' ' ? 0 : width(font, ch) }));
+}
 
 export function layoutItem(item: TextItem, fonts: PageFonts): ItemLayout {
   const font = item.kind === 'sfx' ? fonts.sfx : item.kind === 'caption' ? fonts.caption : fonts.bubble;
-  const lines = wrap(font, item.text || ' ', MAX_W[item.kind]);
-  const lineH = font.getSize() * (item.kind === 'sfx' ? 0.95 : 1.18);
+  const vertical = item.kind === 'sfx' && !!item.vertical;
+  const lines = vertical ? stack(font, item.text || ' ') : wrap(font, item.text || ' ', MAX_W[item.kind]);
+  const lineH = font.getSize() * (vertical ? 0.8 : item.kind === 'sfx' ? 0.95 : 1.18);
   const textW = Math.max(...lines.map((l) => l.width));
   const textH = lines.length * lineH;
   switch (item.kind) {
+    case 'shout': {
+      // the spikes eat into the box, so leave them room
+      const w = Math.max(textW * 1.4 + 70, 150);
+      const h = Math.max(textH * 1.4 + 70, 120);
+      return { font, lines, lineH, w, h };
+    }
     case 'bubble':
+    case 'whisper':
     case 'thought': {
       // an ellipse that fits a w x h text box needs ~sqrt(2) the size
       const w = Math.max(textW * 1.32 + 36, 120);

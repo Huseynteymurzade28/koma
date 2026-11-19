@@ -20,7 +20,7 @@
 - **Page style.** Per page: gutter (tight, normal, wide), panel border (none, thin, normal, bold), white or black paper, and bleed, where panels run to the edge of the paper. **Use this style on every page** copies it to the whole chapter.
 - **Dark mode.** The app follows the system's light or dark theme. Pages themselves always look the same.
 - **Per-panel control.** Tone (light, medium, heavy), line strength (none, soft, bold), and focus or speed lines. Drag inside a panel to reframe the photo and pinch to zoom in, up to 3×. **Move earlier** and **Move later** swap a photo with its neighbour.
-- **Words.** Speech bubbles, thought bubbles, captions and SFX. Drag them anywhere, edit the text, pick one of four sizes, flip a bubble's tail to either side, duplicate one, or shuffle from a built-in word bank that follows the page's mood (action, drama, calm, comedy).
+- **Words.** Speech bubbles, shouts in a jagged burst, whispers in a dashed balloon, thought bubbles, captions and SFX. Drag them anywhere, edit the text, pick one of four sizes, flip a balloon's tail to either side, run an SFX down the panel letter by letter, duplicate one, or shuffle from a built-in word bank that follows the page's mood (action, drama, calm, comedy).
 - **Camera or library.** Take a photo on the spot or choose from your photos, when starting a page and when adding or replacing a panel.
 - **Undo and redo.** Every edit can be stepped back, including removed panels and deleted text.
 - **Chapters.** Every chapter gets a number and a title, and is kept in a library on the device. Long-press a chapter to delete it.

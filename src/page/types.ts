@@ -2,7 +2,12 @@ import type { InkParams } from '@/manga/tones';
 
 export type Mood = 'action' | 'drama' | 'calm' | 'comedy';
 
-export type TextKind = 'bubble' | 'thought' | 'caption' | 'sfx';
+// shout: a jagged burst for yelling; whisper: a dashed outline
+export type TextKind = 'bubble' | 'shout' | 'whisper' | 'thought' | 'caption' | 'sfx';
+
+// kinds drawn as a balloon with a tail or trail of dots
+export const BALLOONS: TextKind[] = ['bubble', 'shout', 'whisper', 'thought'];
+export const isBalloon = (kind: TextKind) => BALLOONS.includes(kind);
 
 export type TextItem = {
   id: string;
@@ -15,8 +20,10 @@ export type TextItem = {
   rotate?: number;
   // drawn size relative to the default, 1 when missing
   size?: number;
-  // bubble and thought: tail on the right instead of the left
+  // balloons: tail on the right instead of the left
   flip?: boolean;
+  // sfx only: letters stacked top to bottom
+  vertical?: boolean;
 };
 
 export type Panel = {

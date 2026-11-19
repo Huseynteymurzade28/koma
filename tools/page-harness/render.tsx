@@ -1,7 +1,8 @@
 // Renders PageDrawing to a PNG on the desktop, using the shader harness output
 // as panel images. Lets us check layout, bubbles and type without a phone.
 //   npx tsx --tsconfig tools/page-harness/tsconfig.json tools/page-harness/render.tsx <out.png> <layout-id> <img1.png> [img2...]
-// Optional env: FRAME='{"gutter":"wide","border":"bold","dark":true,"bleed":true}', SHEET=1 to draw it as a later page.
+// Optional env: FRAME='{"gutter":"wide","border":"bold","dark":true,"bleed":true}', SHEET=1 to draw it as a later page,
+// ITEMS='[{"kind":"shout","text":"HEY!!","x":500,"y":400}]' to letter the page with these items instead of the samples.
 import { readFileSync, writeFileSync } from 'node:fs';
 import React from 'react';
 
@@ -39,7 +40,7 @@ async function main() {
     layout: layout.id,
     frame,
     panels: imgs.map(() => ({ photo: '', ink: DEFAULT_INK, focus: [0.5, 0.5], zoom: 1 })),
-    items: [
+    items: process.env.ITEMS ? JSON.parse(process.env.ITEMS).map((it: object, i: number) => ({ id: `i${i}`, ...it })) : [
       { id: '1', kind: 'caption', text: 'It was an ordinary day.', x: r[0].x + 190, y: r[0].y + 46 },
       { id: '2', kind: 'sfx', text: 'KRAK!', x: r[0].x + r[0].w - 150, y: r[0].y + r[0].h - 90, rotate: -8 },
       { id: '3', kind: 'bubble', text: "This coffee... was my last hope.", x: r[1].x + r[1].w * 0.66, y: r[1].y + 110 },
