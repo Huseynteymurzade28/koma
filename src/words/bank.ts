@@ -399,3 +399,6 @@ export const KIND_LABEL: Record<TextKind, string> = {
   caption: 'Caption',
   sfx: 'Sound',
 };
+
+// for tools/word-check.ts
+export const POOLS = { shared, moods, titleStandalone };
